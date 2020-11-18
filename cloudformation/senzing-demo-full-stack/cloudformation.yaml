@@ -1,0 +1,866 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+
+Description: >-
+  Senzing formation for AWS FARGATE...
+
+# -----------------------------------------------------------------------------
+# Parameters
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+# -----------------------------------------------------------------------------
+
+Parameters:
+
+  AcceptEula:
+    AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
+    ConstraintDescription: >-
+      AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
+    Description: >-
+      Required: If you accept the Senzing End User License Agreements at
+      https://senzing.com/end-user-license-agreement,
+      enter `I_ACCEPT_THE_SENZING_EULA`.
+    Type: String
+
+  DbUsername:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+    Default: senzing
+    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+
+  DbPassword:
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: Must contain only alphanumeric characters.
+    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+
+  SecurityGroupIds:
+    Default: ''
+    Description: >-
+      Optional: Existing security group to associate the container instances.
+      Creates one by default.
+    Type: CommaDelimitedList
+
+  SenzingInputUrl:
+    Default: "https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz"
+    Description: "Required: URL to file of JSON records to be sent to AWS SQS queue."
+    Type: String
+
+  SenzingRecordMax:
+    Default: 0
+    Description: "Required: Last record to read from SenzingInputUrl. '0' means read to end of file."
+    Type: Number
+
+  SenzingRecordMin:
+    Default: 0
+    Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
+    Type: Number
+
+  VpcAvailabilityZones:
+    Default: ''
+    Description: >-
+      Optional: Comma-delimited list of VPC availability zones in which to
+      create subnets.  Required if setting VpcId.
+    Type: CommaDelimitedList
+
+  VpcId:
+    AllowedPattern: '^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$'
+    ConstraintDescription: >-
+      VPC Id must begin with 'vpc-' followed by either an 8 or 17 character
+      identifier, or leave blank to have a new VPC created
+    Default: ''
+    Description: "Optional: VPC Id of existing VPC. Leave blank to have a new VPC created."
+    Type: String
+
+# -----------------------------------------------------------------------------
+# Mappings
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+# -----------------------------------------------------------------------------
+
+Mappings:
+
+  VpcCidrs:
+    vpc:
+      cidr: 10.0.0.0/16
+    pubsubnet1:
+      cidr: 10.0.0.0/24
+    pubsubnet2:
+      cidr: 10.0.1.0/24
+
+# -----------------------------------------------------------------------------
+# Conditions
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html
+# -----------------------------------------------------------------------------
+
+Conditions:
+
+  CreateSecurityGroup: !Equals
+    - !Join
+      - ''
+      - !Ref SecurityGroupIds
+    - ''
+  CreateVpcResources: !Equals
+    - !Ref VpcId
+    - ''
+  UseSpecifiedVpcAvailabilityZones: !Not
+    - !Equals
+      - !Join
+        - ''
+        - !Ref VpcAvailabilityZones
+      - ''
+
+# -----------------------------------------------------------------------------
+# Resources
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+# -----------------------------------------------------------------------------
+
+Resources:
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+
+  Vpc:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - vpc
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-vpc"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+
+  PubSubnetAz1:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !If
+        - UseSpecifiedVpcAvailabilityZones
+        - !Select
+          - '0'
+          - !Ref VpcAvailabilityZones
+        - !Select
+          - '0'
+          - !GetAZs
+            Ref: 'AWS::Region'
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet1
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-1"
+      VpcId: !Ref Vpc
+
+  PubSubnetAz2:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !If
+        - UseSpecifiedVpcAvailabilityZones
+        - !Select
+          - '1'
+          - !Ref VpcAvailabilityZones
+        - !Select
+          - '1'
+          - !GetAZs
+            Ref: 'AWS::Region'
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet2
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-2"
+      VpcId: !Ref Vpc
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+
+  EcsSecurityGroup:
+    Condition: CreateSecurityGroup
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Vpc
+        - !Ref VpcId
+      SecurityGroupIngress:
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: HTTP
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: HTTPS
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: NFS
+          FromPort: 2049
+          IpProtocol: tcp
+          ToPort: 2049
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing X-Term
+          FromPort: 5000
+          IpProtocol: tcp
+          ToPort: 5000
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: PostgreSQL
+          FromPort: 5432
+          IpProtocol: tcp
+          ToPort: 5432
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing API server
+          FromPort: 8250
+          IpProtocol: tcp
+          ToPort: 8250
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing Web App
+          FromPort: 8251
+          IpProtocol: tcp
+          ToPort: 8251
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Swagger UI
+          FromPort: 8080
+          IpProtocol: tcp
+          ToPort: 8080
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing Jupyter notebooks
+          FromPort: 8888
+          IpProtocol: tcp
+          ToPort: 8888
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: phpPgAdmin
+          FromPort: 9171
+          IpProtocol: tcp
+          ToPort: 9171
+      SecurityGroupEgress:
+        -
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+
+  InternetGateway:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+
+  AttachGateway:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+
+  RouteViaIgw:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+
+  PublicRouteViaIgw:
+    Condition: CreateVpcResources
+    DependsOn:
+     - AttachGateway
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteViaIgw
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+
+  PubSubnet1RouteTableAssociation:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubSubnetAz1
+      RouteTableId: !Ref RouteViaIgw
+
+  PubSubnet2RouteTableAssociation:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubSubnetAz2
+      RouteTableId: !Ref RouteViaIgw
+
+# -- Elastic File System ------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-filesystem.html
+
+  EfsFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      PerformanceMode: generalPurpose
+      Encrypted: false
+      ThroughputMode: bursting
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-efs-filesystem"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-mounttarget.html
+
+  EfsMountTarget1:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId:
+        Ref: EfsFileSystem
+      SecurityGroups:
+        - Ref: EcsSecurityGroup
+      SubnetId:
+        Ref: PubSubnetAz1
+
+  EfsMountTarget2:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId:
+        Ref: EfsFileSystem
+      SecurityGroups:
+        - Ref: EcsSecurityGroup
+      SubnetId:
+        Ref: PubSubnetAz2
+
+# -- Database -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbsubnet-group.html
+
+  RdsDbSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    DependsOn:
+      - PubSubnetAz1
+      - PubSubnetAz2
+    Properties:
+      DBSubnetGroupDescription: !Sub "${AWS::StackName}-db-subnet-description"
+      DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet"
+      SubnetIds:
+        - !Ref PubSubnetAz1
+        - !Ref PubSubnetAz2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-subnet-group"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbclusterparametergroup.html
+
+  RdsDbClusterParameterGroup:
+    Type: "AWS::RDS::DBClusterParameterGroup"
+    Properties:
+      Description: !Sub "${AWS::StackName}-db-cluster-parameter-group-description"
+      Family: "aurora-postgresql10"
+      Parameters:
+        "synchronous_commit": "off"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
+
+  RdsCluster:
+    Type: 'AWS::RDS::DBCluster'
+    DependsOn:
+      - RdsDbSubnetGroup
+      - RdsDbClusterParameterGroup
+    Properties:
+      AvailabilityZones:
+        - !GetAtt PubSubnetAz1.AvailabilityZone
+        - !GetAtt PubSubnetAz2.AvailabilityZone
+      DatabaseName: "G2"
+      DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
+      DBClusterParameterGroupName:
+        Ref: RdsDbClusterParameterGroup
+      DBSubnetGroupName:
+        Ref: RdsDbSubnetGroup
+      DeletionProtection: false
+      EnableHttpEndpoint: true
+      EnableIAMDatabaseAuthentication: false
+      Engine: "aurora-postgresql"
+      EngineMode: "serverless"
+      EngineVersion: "10.7"
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword: !Ref DbPassword
+      StorageEncrypted: true
+      ScalingConfiguration:
+        MinCapacity: 2
+        MaxCapacity: 32
+        AutoPause: true
+        SecondsUntilAutoPause: 3600
+#       https://github.com/aws-cloudformation/aws-cloudformation-coverage-roadmap/issues/298
+#       TimeoutAction: ForceApplyCapacityChange
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster"
+      VpcSecurityGroupIds:
+        - !Ref EcsSecurityGroup
+
+# -- Queue --------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
+
+  SQSQueueDeadLetter:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      DelaySeconds: "0"
+      MaximumMessageSize: "262144"
+      MessageRetentionPeriod: "1209600"
+      ReceiveMessageWaitTimeSeconds: "0"
+      VisibilityTimeout: "30"
+      QueueName: !Sub "${AWS::StackName}-sqs-dead-letter-queue"
+
+  SQSQueue:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      DelaySeconds: "0"
+      MaximumMessageSize: "262144"
+      MessageRetentionPeriod: "1209600"
+      ReceiveMessageWaitTimeSeconds: "0"
+      VisibilityTimeout: "300"
+      QueueName: !Sub "${AWS::StackName}-sqs-queue"
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - "SQSQueueDeadLetter"
+            - "Arn"
+        maxReceiveCount: 100
+
+# -- ECS Cluster --------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
+
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      ClusterSettings:
+        -
+          Name: "containerInsights"
+          Value: "disabled"
+
+# -- Authentication -----------------------------------------------------------
+
+# TODO: Needed for stream-producer.
+
+# -- Logging ------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
+
+  LogsLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
+
+# -- Tasks --------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+
+  ECSTaskDefinitionInitEfs:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Command:
+            - "mkdir"
+            - "/efs/g2"
+            - "&&"
+            - "mkdir"
+            - "-p"
+            - "/efs/data/1.0.0"
+            - "&&"
+            - "mkdir"
+            - "/efs/etc"
+            - "&&"
+            - "mkdir"
+            - "/efs/var"
+          Essential: true
+          Image: "busybox"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-efs-root"
+              ContainerPath: "/efs"
+              ReadOnly: false
+          Name: "efsinitcontainer"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-init-efs"
+      Memory: 1024
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-efs-root"
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/"
+
+  ECSTaskDefinitionInstallSenzing:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_ACCEPT_EULA"
+              Value: !Ref AcceptEula
+          Essential: true
+          Image: "senzing/yum:1.1.3"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+
+          Name: "yum"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+          User: "0"
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-yum"
+      Memory: 4096
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-data-dir"
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/data"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/g2"
+
+  ECSTaskDefinitionInitPostgres:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_SQL_FILE"
+              Value: "/opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql"
+            -
+              Name: "SENZING_DATABASE_URL"
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: "senzing/postgresql-client:1.0.0"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+          Name: "postgresinit"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
+      Memory: 1024
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/g2"
+
+  ECSTaskDefinitionInitSenzing:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_DATABASE_URL"
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: "senzing/init-container:1.5.9"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-version-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-etc-dir"
+              ContainerPath: "/etc/opt/senzing"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+          Name: "initcontainer"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+          User: "0"
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-init-container"
+      Memory: 4096
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-data-version-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/data/1.0.0"
+        -
+          Name: "senzing-etc-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/etc"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/g2"
+
+
+  ECSTaskDefinitionStreamProducer1:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_READ_QUEUE_MAXSIZE"
+              Value: "200"
+            -
+              Name: "SENZING_THREADS_PER_PRINT"
+              Value: "30"
+            -
+              Name: "SENZING_RECORD_MAX"
+              Value: !Sub "${SenzingRecordMax}"
+            -
+              Name: "SENZING_INPUT_URL"
+              Value: !Sub "${SenzingInputUrl}"
+            -
+              Name: "SENZING_SQS_QUEUE_URL"
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SQSQueue.QueueName}"
+            -
+              Name: "SENZING_RECORD_MONITOR"
+              Value: "100000"
+            -
+              Name: "SENZING_MONITORING_PERIOD_IN_SECONDS"
+              Value: "60"
+            -
+              Name: "SENZING_SUBCOMMAND"
+              Value: "gzipped-json-to-sqs-batch"
+            -
+              Name: "SENZING_RECORD_MIN"
+              Value: !Sub "${SenzingRecordMin}"
+          Essential: true
+          Image: "senzing/stream-producer:1.2.2"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-version-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-etc-dir"
+              ContainerPath: "/etc/opt/senzing"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+          Name: "producer1"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-stream-producer-1"
+      Memory: 8192
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-data-version-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/data/1.0.0"
+        -
+          Name: "senzing-etc-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/etc"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/g2"
+
+# -----------------------------------------------------------------------------
+# Outputs
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  Vpc:
+    Description: The ID of the VPC
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+
+  Subnet1:
+    Description: The ID of subnet 1
+    Value: !Ref PubSubnetAz1
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet1"
+
+  Subnet2:
+    Description: The ID of subnet 2
+    Value: !Ref PubSubnetAz2
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet2"
