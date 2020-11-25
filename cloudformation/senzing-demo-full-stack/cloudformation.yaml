@@ -105,9 +105,11 @@ Conditions:
       - ''
       - !Ref SecurityGroupIds
     - ''
+
   CreateVpcResources: !Equals
     - !Ref VpcId
     - ''
+
   UseSpecifiedVpcAvailabilityZones: !Not
     - !Equals
       - !Join
@@ -161,6 +163,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-1"
       VpcId: !Ref Vpc
+
 
   PubSubnetAz2:
     Condition: CreateVpcResources
@@ -321,6 +324,7 @@ Resources:
       SubnetId: !Ref PubSubnetAz1
       RouteTableId: !Ref RouteViaIgw
 
+
   PubSubnet2RouteTableAssociation:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
@@ -353,6 +357,7 @@ Resources:
         - Ref: EcsSecurityGroup
       SubnetId:
         Ref: PubSubnetAz1
+
 
   EfsMountTarget2:
     Type: 'AWS::EFS::MountTarget'
@@ -398,42 +403,42 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
 
-  RdsCluster:
-    Type: 'AWS::RDS::DBCluster'
-    DependsOn:
-      - RdsDbSubnetGroup
-      - RdsDbClusterParameterGroup
-    Properties:
-      AvailabilityZones:
-        - !GetAtt PubSubnetAz1.AvailabilityZone
-        - !GetAtt PubSubnetAz2.AvailabilityZone
-      DatabaseName: "G2"
-      DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
-      DBClusterParameterGroupName:
-        Ref: RdsDbClusterParameterGroup
-      DBSubnetGroupName:
-        Ref: RdsDbSubnetGroup
-      DeletionProtection: false
-      EnableHttpEndpoint: true
-      EnableIAMDatabaseAuthentication: false
-      Engine: "aurora-postgresql"
-      EngineMode: "serverless"
-      EngineVersion: "10.7"
-      MasterUsername: !Ref DbUsername
-      MasterUserPassword: !Ref DbPassword
-      StorageEncrypted: true
-      ScalingConfiguration:
-        MinCapacity: 2
-        MaxCapacity: 32
-        AutoPause: true
-        SecondsUntilAutoPause: 3600
+# RdsCluster:
+#   Type: 'AWS::RDS::DBCluster'
+#   DependsOn:
+#     - RdsDbSubnetGroup
+#     - RdsDbClusterParameterGroup
+#   Properties:
+#     AvailabilityZones:
+#       - !GetAtt PubSubnetAz1.AvailabilityZone
+#       - !GetAtt PubSubnetAz2.AvailabilityZone
+#     DatabaseName: "G2"
+#     DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
+#     DBClusterParameterGroupName:
+#       Ref: RdsDbClusterParameterGroup
+#     DBSubnetGroupName:
+#       Ref: RdsDbSubnetGroup
+#     DeletionProtection: false
+#     EnableHttpEndpoint: true
+#     EnableIAMDatabaseAuthentication: false
+#     Engine: "aurora-postgresql"
+#     EngineMode: "serverless"
+#     EngineVersion: "10.7"
+#     MasterUsername: !Ref DbUsername
+#     MasterUserPassword: !Ref DbPassword
+#     StorageEncrypted: true
+#     ScalingConfiguration:
+#       MinCapacity: 2
+#       MaxCapacity: 32
+#       AutoPause: true
+#       SecondsUntilAutoPause: 3600
 #       https://github.com/aws-cloudformation/aws-cloudformation-coverage-roadmap/issues/298
 #       TimeoutAction: ForceApplyCapacityChange
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-rds-db-cluster"
-      VpcSecurityGroupIds:
-        - !Ref EcsSecurityGroup
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-rds-db-cluster"
+#     VpcSecurityGroupIds:
+#       - !Ref EcsSecurityGroup
 
 # -- Queue --------------------------------------------------------------------
 
@@ -448,6 +453,7 @@ Resources:
       ReceiveMessageWaitTimeSeconds: "0"
       VisibilityTimeout: "30"
       QueueName: !Sub "${AWS::StackName}-sqs-dead-letter-queue"
+
 
   SQSQueue:
     Type: "AWS::SQS::Queue"
@@ -564,6 +570,7 @@ Resources:
               Ref: EfsFileSystem
             RootDirectory: "/"
 
+
   ECSTaskDefinitionInstallSenzing:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
@@ -627,131 +634,132 @@ Resources:
               Ref: EfsFileSystem
             RootDirectory: "/g2"
 
-  ECSTaskDefinitionInitPostgres:
-    Type: "AWS::ECS::TaskDefinition"
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: "SENZING_SQL_FILE"
-              Value: "/opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql"
-            -
-              Name: "SENZING_DATABASE_URL"
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
-          Essential: true
-          Image: "senzing/postgresql-client:1.0.0"
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: "awslogs"
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "advanced"
-          MountPoints:
-            -
-              SourceVolume: "senzing-g2-dir"
-              ContainerPath: "/opt/senzing/g2"
-              ReadOnly: false
-          Name: "postgresinit"
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: 512
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
-      Memory: 1024
-      NetworkMode: "awsvpc"
-      RequiresCompatibilities:
-        - "FARGATE"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
-      Volumes:
-        -
-          Name: "senzing-g2-dir"
-          EFSVolumeConfiguration:
-            AuthorizationConfig: {}
-            FilesystemId:
-              Ref: EfsFileSystem
-            RootDirectory: "/g2"
+# ECSTaskDefinitionInitPostgres:
+#   Type: "AWS::ECS::TaskDefinition"
+#   DependsOn:
+#     - EfsMountTarget1
+#     - EfsMountTarget2
+#   Properties:
+#     ContainerDefinitions:
+#       -
+#         Environment:
+#           -
+#             Name: "SENZING_SQL_FILE"
+#             Value: "/opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql"
+#           -
+#             Name: "SENZING_DATABASE_URL"
+#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
+#         Essential: true
+#         Image: "senzing/postgresql-client:1.0.0"
+#         LinuxParameters:
+#           Capabilities: {}
+#         LogConfiguration:
+#           LogDriver: "awslogs"
+#           Options:
+#             awslogs-group: !Sub "${AWS::StackName}-log-group"
+#             awslogs-region: !Ref AWS::Region
+#             awslogs-stream-prefix: "advanced"
+#         MountPoints:
+#           -
+#             SourceVolume: "senzing-g2-dir"
+#             ContainerPath: "/opt/senzing/g2"
+#             ReadOnly: false
+#         Name: "postgresinit"
+#         Privileged: false
+#         PseudoTerminal: false
+#         ReadonlyRootFilesystem: false
+#     Cpu: 512
+#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+#     Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
+#     Memory: 1024
+#     NetworkMode: "awsvpc"
+#     RequiresCompatibilities:
+#       - "FARGATE"
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-init-efs"
+#     Volumes:
+#       -
+#         Name: "senzing-g2-dir"
+#         EFSVolumeConfiguration:
+#           AuthorizationConfig: {}
+#           FilesystemId:
+#             Ref: EfsFileSystem
+#           RootDirectory: "/g2"
 
-  ECSTaskDefinitionInitSenzing:
-    Type: "AWS::ECS::TaskDefinition"
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: "SENZING_DATABASE_URL"
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
-          Essential: true
-          Image: "senzing/init-container:1.5.9"
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: "awslogs"
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "advanced"
-          MountPoints:
-            -
-              SourceVolume: "senzing-data-version-dir"
-              ContainerPath: "/opt/senzing/data"
-              ReadOnly: false
-            -
-              SourceVolume: "senzing-etc-dir"
-              ContainerPath: "/etc/opt/senzing"
-              ReadOnly: false
-            -
-              SourceVolume: "senzing-g2-dir"
-              ContainerPath: "/opt/senzing/g2"
-              ReadOnly: false
-          Name: "initcontainer"
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-          User: "0"
-      Cpu: 512
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      Family: !Sub "${AWS::StackName}-task-definition-init-container"
-      Memory: 4096
-      NetworkMode: "awsvpc"
-      RequiresCompatibilities:
-        - "FARGATE"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
-      Volumes:
-        -
-          Name: "senzing-data-version-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/data/1.0.0"
-        -
-          Name: "senzing-etc-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/etc"
-        -
-          Name: "senzing-g2-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/g2"
+
+# ECSTaskDefinitionInitSenzing:
+#   Type: "AWS::ECS::TaskDefinition"
+#   DependsOn:
+#     - EfsMountTarget1
+#     - EfsMountTarget2
+#   Properties:
+#     ContainerDefinitions:
+#       -
+#         Environment:
+#           -
+#             Name: "SENZING_DATABASE_URL"
+#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
+#         Essential: true
+#         Image: "senzing/init-container:1.5.9"
+#         LinuxParameters:
+#           Capabilities: {}
+#         LogConfiguration:
+#           LogDriver: "awslogs"
+#           Options:
+#             awslogs-group: !Sub "${AWS::StackName}-log-group"
+#             awslogs-region: !Ref AWS::Region
+#             awslogs-stream-prefix: "advanced"
+#         MountPoints:
+#           -
+#             SourceVolume: "senzing-data-version-dir"
+#             ContainerPath: "/opt/senzing/data"
+#             ReadOnly: false
+#           -
+#             SourceVolume: "senzing-etc-dir"
+#             ContainerPath: "/etc/opt/senzing"
+#             ReadOnly: false
+#           -
+#             SourceVolume: "senzing-g2-dir"
+#             ContainerPath: "/opt/senzing/g2"
+#             ReadOnly: false
+#         Name: "initcontainer"
+#         Privileged: false
+#         PseudoTerminal: false
+#         ReadonlyRootFilesystem: false
+#         User: "0"
+#     Cpu: 512
+#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+#     Family: !Sub "${AWS::StackName}-task-definition-init-container"
+#     Memory: 4096
+#     NetworkMode: "awsvpc"
+#     RequiresCompatibilities:
+#       - "FARGATE"
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-init-efs"
+#     Volumes:
+#       -
+#         Name: "senzing-data-version-dir"
+#         EFSVolumeConfiguration:
+#             AuthorizationConfig: {}
+#             FilesystemId:
+#               Ref: EfsFileSystem
+#             RootDirectory: "/data/1.0.0"
+#       -
+#         Name: "senzing-etc-dir"
+#         EFSVolumeConfiguration:
+#             AuthorizationConfig: {}
+#             FilesystemId:
+#               Ref: EfsFileSystem
+#             RootDirectory: "/etc"
+#       -
+#         Name: "senzing-g2-dir"
+#         EFSVolumeConfiguration:
+#             AuthorizationConfig: {}
+#             FilesystemId:
+#               Ref: EfsFileSystem
+#             RootDirectory: "/g2"
 
 
   ECSTaskDefinitionStreamProducer1:
@@ -1003,6 +1011,7 @@ Resources:
           Value: !Sub "${AWS::StackName}-lambda-run"
       Timeout: 30
 
+
   LambdaFunctionRunTaskAndWait:
     Type: AWS::Lambda::Function
     Properties:
@@ -1055,26 +1064,32 @@ Resources:
 
                       # Make AWS ECS request.
 
+                      logger.info("1.0")
                       ecs = boto3.client('ecs')
                       response = ecs.run_task(**run_task_parameters)
+                      logger.info("Initial Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
                       # Wait for completion.
 
                       waiter = ecs.get_waiter('tasks_stopped')
+                      logger.info("1.1")
+
                       waiter.wait(
                           cluster=properties['ClusterId'],
                           tasks=[response['tasks'][0]['taskArn']],
                       )
+                      logger.info("1.2")
 
                       response['describe_task'] = ecs.describe_tasks(
                           cluster=properties['ClusterId'],
                           tasks=[response['tasks'][0]['taskArn']],
                       )
-                      # logger.info("describe_task response: {0}".format(json.dumps(response['describe_task'], cls=DateTimeEncoder)))
+                      logger.info("1.3")
+                      logger.info("describe_task response: {0}".format(json.dumps(response['describe_task'], cls=DateTimeEncoder)))
 
-                      # exit_code = response.get('describe_task', {}).get('tasks', [{}])[0].get('containers', [{}])[0].get('exitCode', 99)
-                      # if exit_code != 0:
-                      #   result = cfnresponse.FAILED
+                      exit_code = response.get('describe_task', {}).get('tasks', [{}])[0].get('containers', [{}])[0].get('exitCode', 99)
+                      if exit_code != 0:
+                          result = cfnresponse.FAILED
                   logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
               except Exception as e:
@@ -1092,7 +1107,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-run-and-wait"
-      Timeout: 30
+      Timeout: 120
 
 # -- Run ECS tasks-------------------------------------------------------------
 
@@ -1107,7 +1122,8 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-runner"
 
-  LambdaRunner1:
+
+  LambdaRunnerInitEfs:
     DependsOn:
      - ECSCluster
      - ECSTaskDefinitionInitEfs
@@ -1136,7 +1152,7 @@ Resources:
         platformVersion: 1.4.0
         tags:
           - key: Name
-            value: !Sub "${AWS::StackName}-lambda-runner-1"
+            value: !Sub "${AWS::StackName}-lambda-runner-init-efs"
         taskDefinition: !Ref ECSTaskDefinitionInitEfs
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunner1
@@ -1154,11 +1170,13 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-VpcId"
 
+
   Subnet1:
     Description: The ID of subnet 1
     Value: !Ref PubSubnetAz1
     Export:
       Name: !Sub "${AWS::StackName}-Subnet1"
+
 
   Subnet2:
     Description: The ID of subnet 2
