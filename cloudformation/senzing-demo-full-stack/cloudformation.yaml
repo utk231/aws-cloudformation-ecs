@@ -390,55 +390,55 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbclusterparametergroup.html
 
-# RdsDbClusterParameterGroup:
-#   Type: "AWS::RDS::DBClusterParameterGroup"
-#   Properties:
-#     Description: !Sub "${AWS::StackName}-db-cluster-parameter-group-description"
-#     Family: "aurora-postgresql10"
-#     Parameters:
-#       "synchronous_commit": "off"
-#     Tags:
-#       - Key: Name
-#         Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
+  RdsDbClusterParameterGroup:
+    Type: "AWS::RDS::DBClusterParameterGroup"
+    Properties:
+      Description: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group-description"
+      Family: "aurora-postgresql10"
+      Parameters:
+        "synchronous_commit": "off"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
 
-# RdsCluster:
-#   Type: 'AWS::RDS::DBCluster'
-#   DependsOn:
-#     - RdsDbSubnetGroup
-#     - RdsDbClusterParameterGroup
-#   Properties:
-#     AvailabilityZones:
-#       - !GetAtt Ec2SubnetPublic1.AvailabilityZone
-#       - !GetAtt Ec2SubnetPublic2.AvailabilityZone
-#     DatabaseName: "G2"
-#     DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
-#     DBClusterParameterGroupName:
-#       Ref: RdsDbClusterParameterGroup
-#     DBSubnetGroupName:
-#       Ref: RdsDbSubnetGroup
-#     DeletionProtection: false
-#     EnableHttpEndpoint: true
-#     EnableIAMDatabaseAuthentication: false
-#     Engine: "aurora-postgresql"
-#     EngineMode: "serverless"
-#     EngineVersion: "10.7"
-#     MasterUsername: !Ref DbUsername
-#     MasterUserPassword: !Ref DbPassword
-#     StorageEncrypted: true
-#     ScalingConfiguration:
-#       MinCapacity: 2
-#       MaxCapacity: 32
-#       AutoPause: true
-#       SecondsUntilAutoPause: 3600
+  RdsDbCluster:
+    Type: 'AWS::RDS::DBCluster'
+    DependsOn:
+      - RdsDbSubnetGroup
+      - RdsDbClusterParameterGroup
+    Properties:
+      AvailabilityZones:
+        - !GetAtt Ec2SubnetPublic1.AvailabilityZone
+        - !GetAtt Ec2SubnetPublic2.AvailabilityZone
+      DatabaseName: "G2"
+      DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
+      DBClusterParameterGroupName:
+        Ref: RdsDbClusterParameterGroup
+      DBSubnetGroupName:
+        Ref: RdsDbSubnetGroup
+      DeletionProtection: false
+      EnableHttpEndpoint: true
+      EnableIAMDatabaseAuthentication: false
+      Engine: "aurora-postgresql"
+      EngineMode: "serverless"
+      EngineVersion: "10.7"
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword: !Ref DbPassword
+      StorageEncrypted: true
+      ScalingConfiguration:
+        MinCapacity: 2
+        MaxCapacity: 32
+        AutoPause: true
+        SecondsUntilAutoPause: 3600
 #       https://github.com/aws-cloudformation/aws-cloudformation-coverage-roadmap/issues/298
 #       TimeoutAction: ForceApplyCapacityChange
-#     Tags:
-#       - Key: Name
-#         Value: !Sub "${AWS::StackName}-rds-db-cluster"
-#     VpcSecurityGroupIds:
-#       - !Ref EcsSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster"
+      VpcSecurityGroupIds:
+        - !Ref EcsSecurityGroup
 
 # -- Queue --------------------------------------------------------------------
 
@@ -634,58 +634,59 @@ Resources:
               Ref: EfsFileSystem
             RootDirectory: "/g2"
 
-# ECSTaskDefinitionInitPostgres:
-#   Type: "AWS::ECS::TaskDefinition"
-#   DependsOn:
-#     - EfsMountTarget1
-#     - EfsMountTarget2
-#   Properties:
-#     ContainerDefinitions:
-#       -
-#         Environment:
-#           -
-#             Name: "SENZING_SQL_FILE"
-#             Value: "/opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql"
-#           -
-#             Name: "SENZING_DATABASE_URL"
-#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
-#         Essential: true
-#         Image: "senzing/postgresql-client:1.0.0"
-#         LinuxParameters:
-#           Capabilities: {}
-#         LogConfiguration:
-#           LogDriver: "awslogs"
-#           Options:
-#             awslogs-group: !Sub "${AWS::StackName}-log-group"
-#             awslogs-region: !Ref AWS::Region
-#             awslogs-stream-prefix: "advanced"
-#         MountPoints:
-#           -
-#             SourceVolume: "senzing-g2-dir"
-#             ContainerPath: "/opt/senzing/g2"
-#             ReadOnly: false
-#         Name: "postgresinit"
-#         Privileged: false
-#         PseudoTerminal: false
-#         ReadonlyRootFilesystem: false
-#     Cpu: 512
-#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-#     Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
-#     Memory: 1024
-#     NetworkMode: "awsvpc"
-#     RequiresCompatibilities:
-#       - "FARGATE"
-#     Tags:
-#       - Key: Name
-#         Value: !Sub "${AWS::StackName}-init-efs"
-#     Volumes:
-#       -
-#         Name: "senzing-g2-dir"
-#         EFSVolumeConfiguration:
-#           AuthorizationConfig: {}
-#           FilesystemId:
-#             Ref: EfsFileSystem
-#           RootDirectory: "/g2"
+  EcsTaskDefinitionInitPostgres:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+      - RdsDbCluster
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_SQL_FILE"
+              Value: "/opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql"
+            -
+              Name: "SENZING_DATABASE_URL"
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: "senzing/postgresql-client:1.0.0"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+          Name: "postgresinit"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
+      Memory: 1024
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-postgres"
+      Volumes:
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/g2"
 
 
 # ECSTaskDefinitionInitSenzing:
@@ -699,7 +700,7 @@ Resources:
 #         Environment:
 #           -
 #             Name: "SENZING_DATABASE_URL"
-#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsCluster.Endpoint.Address}:${RdsCluster.Endpoint.Port}/G2"
+#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
 #         Essential: true
 #         Image: "senzing/init-container:1.5.9"
 #         LinuxParameters:
@@ -1157,6 +1158,7 @@ Resources:
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInitEfs
 
+
   LambdaRunnerInstallSenzing:
     DependsOn:
      - LambdaRunnerInitEfs
@@ -1182,6 +1184,34 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionInstallSenzing
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInstallSenzing
+
+
+  LambdaRunnerInitPostgres:
+    DependsOn:
+     - LambdaRunnerInstallSenzing
+     - RdsDbCluster
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: ENABLED
+            securityGroups:
+              - !Ref EcsSecurityGroup
+            subnets:
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-init-postgres"
+        taskDefinition: !Ref EcsTaskDefinitionInitPostgres
+      ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
+    Type: Custom::LambdaRunnerInitPostgres
 
 # -----------------------------------------------------------------------------
 # Outputs
