@@ -285,7 +285,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
-  Ec2AttachGateway:
+  Ec2VpcGatewayAttachment:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
@@ -294,7 +294,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
 
-  RouteViaIgw:
+  Ec2RouteTable:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::RouteTable'
     Properties:
@@ -305,32 +305,32 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
 
-  PublicRouteViaIgw:
+  Ec2Route:
     Condition: CreateVpcResources
     DependsOn:
-     - Ec2AttachGateway
+     - Ec2VpcGatewayAttachment
     Type: 'AWS::EC2::Route'
     Properties:
-      RouteTableId: !Ref RouteViaIgw
+      RouteTableId: !Ref Ec2RouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Ec2InternetGateway
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
 
-  PubSubnet1RouteTableAssociation:
+  Ec2SubnetRouteTableAssociation1:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       SubnetId: !Ref Ec2SubnetPublic1
-      RouteTableId: !Ref RouteViaIgw
+      RouteTableId: !Ref Ec2RouteTable
 
 
-  PubSubnet2RouteTableAssociation:
+  Ec2SubnetRouteTableAssociation2:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       SubnetId: !Ref Ec2SubnetPublic2
-      RouteTableId: !Ref RouteViaIgw
+      RouteTableId: !Ref Ec2RouteTable
 
 # -- Elastic File System ------------------------------------------------------
 
@@ -444,7 +444,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
 
-  SQSQueueDeadLetter:
+  SqsQueueDeadLetter:
     Type: "AWS::SQS::Queue"
     Properties:
       DelaySeconds: "0"
@@ -455,7 +455,7 @@ Resources:
       QueueName: !Sub "${AWS::StackName}-sqs-dead-letter-queue"
 
 
-  SQSQueue:
+  SqsQueue:
     Type: "AWS::SQS::Queue"
     Properties:
       DelaySeconds: "0"
@@ -467,7 +467,7 @@ Resources:
       RedrivePolicy:
         deadLetterTargetArn:
           Fn::GetAtt:
-            - "SQSQueueDeadLetter"
+            - "SqsQueueDeadLetter"
             - "Arn"
         maxReceiveCount: 100
 
@@ -475,7 +475,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
 
-  ECSCluster:
+  EcsCluster:
     Type: "AWS::ECS::Cluster"
     Properties:
       ClusterName: !Sub "${AWS::StackName}-cluster"
@@ -511,7 +511,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
 
-  ECSTaskDefinitionInitEfs:
+  EcsTaskDefinitionInitEfs:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -571,7 +571,7 @@ Resources:
             RootDirectory: "/"
 
 
-  ECSTaskDefinitionInstallSenzing:
+  EcsTaskDefinitionInstallSenzing:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -762,7 +762,7 @@ Resources:
 #             RootDirectory: "/g2"
 
 
-  ECSTaskDefinitionStreamProducer1:
+  EcsTaskDefinitionStreamProducer1:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -785,7 +785,7 @@ Resources:
               Value: !Sub "${SenzingInputUrl}"
             -
               Name: "SENZING_SQS_QUEUE_URL"
-              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SQSQueue.QueueName}"
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
             -
               Name: "SENZING_RECORD_MONITOR"
               Value: "100000"
@@ -863,7 +863,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
-  LambdaFunctionRole:
+  IamRoleLambda:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -899,10 +899,10 @@ Resources:
             Effect: Allow
             Resource:
               - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      RoleName: !Sub "${AWS::StackName}-lambda-function-role"
+      RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-debug"
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
@@ -932,7 +932,7 @@ Resources:
       Description: Logs the event object
       FunctionName: !Sub "${AWS::StackName}-lambda-debug"
       Handler: index.handler
-      Role: !GetAtt LambdaFunctionRole.Arn
+      Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
@@ -1004,7 +1004,7 @@ Resources:
       Description: Runs an ECS task
       FunctionName: !Sub "${AWS::StackName}-lambda-run"
       Handler: index.handler
-      Role: !GetAtt LambdaFunctionRole.Arn
+      Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
@@ -1102,7 +1102,7 @@ Resources:
       Description: Runs an ECS task and waits until completion
       FunctionName: !Sub "${AWS::StackName}-lambda-run-and-wait"
       Handler: index.handler
-      Role: !GetAtt LambdaFunctionRole.Arn
+      Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
@@ -1114,19 +1114,19 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
 
   LambdaRunnerDebug:
-    Type: Custom::LambdaRunnerDebug
     DependsOn: LambdaFunctionDebug
     Properties:
       ServiceToken: !GetAtt LambdaFunctionDebug.Arn
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-runner-debug"
+    Type: Custom::LambdaRunnerDebug
 
 
   LambdaRunnerInitEfs:
     DependsOn:
-     - ECSCluster
-     - ECSTaskDefinitionInitEfs
+     - EcsCluster
+     - EcsTaskDefinitionInitEfs
      - EcsSecurityGroup
      - EfsFileSystem
      - EfsMountTarget1
@@ -1135,10 +1135,10 @@ Resources:
      - Ec2SubnetPublic1
      - Ec2SubnetPublic2
     Properties:
-      ClusterId: !Ref ECSCluster
+      ClusterId: !Ref EcsCluster
       RunTaskParameters:
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
-        cluster: !Ref ECSCluster
+        cluster: !Ref EcsCluster
         count: 1
         launchType: FARGATE
         networkConfiguration:
@@ -1153,7 +1153,7 @@ Resources:
         tags:
           - key: Name
             value: !Sub "${AWS::StackName}-lambda-runner-init-efs"
-        taskDefinition: !Ref ECSTaskDefinitionInitEfs
+        taskDefinition: !Ref EcsTaskDefinitionInitEfs
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInitEfs
 
