@@ -142,7 +142,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
 
-  PubSubnetAz1:
+  Ec2SubnetPublic1:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -165,7 +165,7 @@ Resources:
       VpcId: !Ref Vpc
 
 
-  PubSubnetAz2:
+  Ec2SubnetPublic2:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -321,7 +321,7 @@ Resources:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
-      SubnetId: !Ref PubSubnetAz1
+      SubnetId: !Ref Ec2SubnetPublic1
       RouteTableId: !Ref RouteViaIgw
 
 
@@ -329,7 +329,7 @@ Resources:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
-      SubnetId: !Ref PubSubnetAz2
+      SubnetId: !Ref Ec2SubnetPublic2
       RouteTableId: !Ref RouteViaIgw
 
 # -- Elastic File System ------------------------------------------------------
@@ -356,7 +356,7 @@ Resources:
       SecurityGroups:
         - Ref: EcsSecurityGroup
       SubnetId:
-        Ref: PubSubnetAz1
+        Ref: Ec2SubnetPublic1
 
 
   EfsMountTarget2:
@@ -367,7 +367,7 @@ Resources:
       SecurityGroups:
         - Ref: EcsSecurityGroup
       SubnetId:
-        Ref: PubSubnetAz2
+        Ref: Ec2SubnetPublic2
 
 # -- Database -----------------------------------------------------------------
 
@@ -376,14 +376,14 @@ Resources:
   RdsDbSubnetGroup:
     Type: "AWS::RDS::DBSubnetGroup"
     DependsOn:
-      - PubSubnetAz1
-      - PubSubnetAz2
+      - Ec2SubnetPublic1
+      - Ec2SubnetPublic2
     Properties:
       DBSubnetGroupDescription: !Sub "${AWS::StackName}-db-subnet-description"
       DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet"
       SubnetIds:
-        - !Ref PubSubnetAz1
-        - !Ref PubSubnetAz2
+        - !Ref Ec2SubnetPublic1
+        - !Ref Ec2SubnetPublic2
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-rds-db-subnet-group"
@@ -410,8 +410,8 @@ Resources:
 #     - RdsDbClusterParameterGroup
 #   Properties:
 #     AvailabilityZones:
-#       - !GetAtt PubSubnetAz1.AvailabilityZone
-#       - !GetAtt PubSubnetAz2.AvailabilityZone
+#       - !GetAtt Ec2SubnetPublic1.AvailabilityZone
+#       - !GetAtt Ec2SubnetPublic2.AvailabilityZone
 #     DatabaseName: "G2"
 #     DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
 #     DBClusterParameterGroupName:
@@ -906,7 +906,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
-  LambdaDebug:
+  LambdaFunctionDebug:
     Type: AWS::Lambda::Function
     Properties:
       Code:
@@ -942,8 +942,8 @@ Resources:
 #       SecurityGroupIds:
 #         - !Ref EcsSecurityGroup
 #       SubnetIds:
-#         - !Ref PubSubnetAz1
-#         - !Ref PubSubnetAz2
+#         - !Ref Ec2SubnetPublic1
+#         - !Ref Ec2SubnetPublic2
 
 
   LambdaRunTask:
@@ -1115,12 +1115,12 @@ Resources:
 
   LambdaRunnerDebug:
     Type: Custom::LambdaRunnerDebug
-    DependsOn: LambdaDebug
+    DependsOn: LambdaFunctionDebug
     Properties:
-      ServiceToken: !GetAtt LambdaDebug.Arn
+      ServiceToken: !GetAtt LambdaFunctionDebug.Arn
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-runner"
+          Value: !Sub "${AWS::StackName}-lambda-runner-debug"
 
 
   LambdaRunnerInitEfs:
@@ -1132,8 +1132,8 @@ Resources:
      - EfsMountTarget1
      - EfsMountTarget2
      - LambdaFunctionRunTaskAndWait
-     - PubSubnetAz1
-     - PubSubnetAz2
+     - Ec2SubnetPublic1
+     - Ec2SubnetPublic2
     Properties:
       ClusterId: !Ref ECSCluster
       RunTaskParameters:
@@ -1147,15 +1147,15 @@ Resources:
             securityGroups:
               - !Ref EcsSecurityGroup
             subnets:
-              - !Ref PubSubnetAz1
-              - !Ref PubSubnetAz2
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
         platformVersion: 1.4.0
         tags:
           - key: Name
             value: !Sub "${AWS::StackName}-lambda-runner-init-efs"
         taskDefinition: !Ref ECSTaskDefinitionInitEfs
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
-    Type: Custom::LambdaRunner1
+    Type: Custom::LambdaRunnerInitEfs
 
 # -----------------------------------------------------------------------------
 # Outputs
@@ -1173,13 +1173,13 @@ Outputs:
 
   Subnet1:
     Description: The ID of subnet 1
-    Value: !Ref PubSubnetAz1
+    Value: !Ref Ec2SubnetPublic1
     Export:
       Name: !Sub "${AWS::StackName}-Subnet1"
 
 
   Subnet2:
     Description: The ID of subnet 2
-    Value: !Ref PubSubnetAz2
+    Value: !Ref Ec2SubnetPublic2
     Export:
       Name: !Sub "${AWS::StackName}-Subnet2"
