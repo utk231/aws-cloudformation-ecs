@@ -53,7 +53,7 @@ Parameters:
     Type: String
 
   SenzingRecordMax:
-    Default: 0
+    Default: 100000
     Description: "Required: Last record to read from SenzingInputUrl. '0' means read to end of file."
     Type: Number
 
@@ -124,7 +124,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
 
-  Ec2Vpc:
+  Vpc:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -140,7 +140,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
 
-  Ec2SubnetPublic1:
+  PubSubnetAz1:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -160,9 +160,9 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-1"
-      VpcId: !Ref Ec2Vpc
+      VpcId: !Ref Vpc
 
-  Ec2SubnetPublic2:
+  PubSubnetAz2:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -182,7 +182,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-2"
-      VpcId: !Ref Ec2Vpc
+      VpcId: !Ref Vpc
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
@@ -193,7 +193,7 @@ Resources:
       GroupDescription: ECS Allowed Ports
       VpcId: !If
         - CreateVpcResources
-        - !Ref Ec2Vpc
+        - !Ref Vpc
         - !Ref VpcId
       SecurityGroupIngress:
         -
@@ -272,7 +272,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
-  Ec2InternetGateway:
+  InternetGateway:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::InternetGateway'
     Properties:
@@ -282,51 +282,51 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
-  Ec2VpcGatewayAttachment:
+  AttachGateway:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
-      VpcId: !Ref Ec2Vpc
-      InternetGatewayId: !Ref Ec2InternetGateway
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
 
-  Ec2RouteTable:
+  RouteViaIgw:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::RouteTable'
     Properties:
-      VpcId: !Ref Ec2Vpc
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-route-table"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
 
-  Ec2RoutePublic:
+  PublicRouteViaIgw:
     Condition: CreateVpcResources
     DependsOn:
-     - Ec2VpcGatewayAttachment
+     - AttachGateway
     Type: 'AWS::EC2::Route'
     Properties:
-      RouteTableId: !Ref Ec2RouteTable
+      RouteTableId: !Ref RouteViaIgw
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref Ec2InternetGateway
+      GatewayId: !Ref InternetGateway
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
 
-  Ec2SubnetRouteTableAssocationPublic1:
+  PubSubnet1RouteTableAssociation:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
-      SubnetId: !Ref Ec2SubnetPublic1
-      RouteTableId: !Ref Ec2RouteTable
+      SubnetId: !Ref PubSubnetAz1
+      RouteTableId: !Ref RouteViaIgw
 
-  Ec2SubnetRouteTableAssocationPublic2:
+  PubSubnet2RouteTableAssociation:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
-      SubnetId: !Ref Ec2SubnetPublic2
-      RouteTableId: !Ref Ec2RouteTable
+      SubnetId: !Ref PubSubnetAz2
+      RouteTableId: !Ref RouteViaIgw
 
 # -- Elastic File System ------------------------------------------------------
 
@@ -352,7 +352,7 @@ Resources:
       SecurityGroups:
         - Ref: EcsSecurityGroup
       SubnetId:
-        Ref: Ec2SubnetPublic1
+        Ref: PubSubnetAz1
 
   EfsMountTarget2:
     Type: 'AWS::EFS::MountTarget'
@@ -362,7 +362,7 @@ Resources:
       SecurityGroups:
         - Ref: EcsSecurityGroup
       SubnetId:
-        Ref: Ec2SubnetPublic2
+        Ref: PubSubnetAz2
 
 # -- Database -----------------------------------------------------------------
 
@@ -371,14 +371,14 @@ Resources:
   RdsDbSubnetGroup:
     Type: "AWS::RDS::DBSubnetGroup"
     DependsOn:
-      - Ec2SubnetPublic1
-      - Ec2SubnetPublic2
+      - PubSubnetAz1
+      - PubSubnetAz2
     Properties:
       DBSubnetGroupDescription: !Sub "${AWS::StackName}-db-subnet-description"
       DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet"
       SubnetIds:
-        - !Ref Ec2SubnetPublic1
-        - !Ref Ec2SubnetPublic2
+        - !Ref PubSubnetAz1
+        - !Ref PubSubnetAz2
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-rds-db-subnet-group"
@@ -405,8 +405,8 @@ Resources:
       - RdsDbClusterParameterGroup
     Properties:
       AvailabilityZones:
-        - !GetAtt Ec2SubnetPublic1.AvailabilityZone
-        - !GetAtt Ec2SubnetPublic2.AvailabilityZone
+        - !GetAtt PubSubnetAz1.AvailabilityZone
+        - !GetAtt PubSubnetAz2.AvailabilityZone
       DatabaseName: "G2"
       DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
       DBClusterParameterGroupName:
@@ -469,7 +469,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
 
-  EcsCluster:
+  ECSCluster:
     Type: "AWS::ECS::Cluster"
     Properties:
       ClusterName: !Sub "${AWS::StackName}-cluster"
@@ -505,7 +505,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
 
-  EcsTaskDefinitionInitEfs:
+  ECSTaskDefinitionInitEfs:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -564,7 +564,7 @@ Resources:
               Ref: EfsFileSystem
             RootDirectory: "/"
 
-  EcsTaskDefinitionInstallSenzing:
+  ECSTaskDefinitionInstallSenzing:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -855,7 +855,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
-  IamRoleLambda:
+  LambdaFunctionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -898,7 +898,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
-  LambdaFunctionDebug:
+  LambdaDebug:
     Type: AWS::Lambda::Function
     Properties:
       Code:
@@ -924,7 +924,7 @@ Resources:
       Description: Logs the event object
       FunctionName: !Sub "${AWS::StackName}-lambda-debug"
       Handler: index.handler
-      Role: !GetAtt IamRoleLambda.Arn
+      Role: !GetAtt LambdaFunctionRole.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
@@ -934,10 +934,11 @@ Resources:
 #       SecurityGroupIds:
 #         - !Ref EcsSecurityGroup
 #       SubnetIds:
-#         - !Ref Ec2SubnetPublic1
-#         - !Ref Ec2SubnetPublic2
+#         - !Ref PubSubnetAz1
+#         - !Ref PubSubnetAz2
 
-  LambdaFunctionRunTask:
+
+  LambdaRunTask:
     Type: AWS::Lambda::Function
     Properties:
       Code:
@@ -992,14 +993,14 @@ Resources:
               finally:
                   cfnresponse.send(event, context, result, {})
 
-      Description: Runs an ECS task and waits until completion
-      FunctionName: !Sub "${AWS::StackName}-lambda-run-and-wait"
+      Description: Runs an ECS task
+      FunctionName: !Sub "${AWS::StackName}-lambda-run"
       Handler: index.handler
-      Role: !GetAtt IamRoleLambda.Arn
+      Role: !GetAtt LambdaFunctionRole.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-run-and-wait"
+          Value: !Sub "${AWS::StackName}-lambda-run"
       Timeout: 30
 
   LambdaFunctionRunTaskAndWait:
@@ -1014,6 +1015,7 @@ Resources:
           import datetime
           import json
           import logging
+          import time
           import traceback
           from json import JSONEncoder
 
@@ -1031,8 +1033,16 @@ Resources:
               try:
                   logger.info("Event: {0}".format(json.dumps(event)))
                   if event['RequestType'] in ['Create', 'Update']:
-                      properties = event['ResourceProperties']
-                      run_task_parameters = properties['RunTaskParameters']
+                      properties = event.get('ResourceProperties', {})
+                      delay_time_in_seconds = int(properties.get('Delay', 0))
+                      run_task_parameters = properties.get('RunTaskParameters', {})
+
+                      # If requested, sleep.
+
+                      if delay_time_in_seconds > 0:
+                          logger.info("Sleeping {0} seconds".format(delay_time_in_seconds))
+                          time.sleep(delay_time_in_seconds)
+                          logger.info("Awake")
 
                       # Change strings to integers.
 
@@ -1050,20 +1060,21 @@ Resources:
 
                       # Wait for completion.
 
-                      #waiter = ecs.get_waiter('tasks_stopped')
-                      #waiter.wait(
-                      #    cluster=properties['ClusterId'],
-                      #    tasks=[response['tasks'][0]['taskArn']],
-                      #)
+                      waiter = ecs.get_waiter('tasks_stopped')
+                      waiter.wait(
+                          cluster=properties['ClusterId'],
+                          tasks=[response['tasks'][0]['taskArn']],
+                      )
 
-                      #response['describe_task'] = ecs.describe_tasks(
-                      #    cluster=properties['ClusterId'],
-                      #    tasks=[response['tasks'][0]['taskArn']],
-                      #)
+                      response['describe_task'] = ecs.describe_tasks(
+                          cluster=properties['ClusterId'],
+                          tasks=[response['tasks'][0]['taskArn']],
+                      )
+                      # logger.info("describe_task response: {0}".format(json.dumps(response['describe_task'], cls=DateTimeEncoder)))
 
-                      #exit_code = response['describe_task']['tasks'][0]['containers'][0]['exitCode']
-                      #if exit_code != 0:
-                      #  result = cfnresponse.FAILED
+                      # exit_code = response.get('describe_task', {}).get('tasks', [{}])[0].get('containers', [{}])[0].get('exitCode', 99)
+                      # if exit_code != 0:
+                      #   result = cfnresponse.FAILED
                   logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
               except Exception as e:
@@ -1076,7 +1087,7 @@ Resources:
       Description: Runs an ECS task and waits until completion
       FunctionName: !Sub "${AWS::StackName}-lambda-run-and-wait"
       Handler: index.handler
-      Role: !GetAtt IamRoleLambda.Arn
+      Role: !GetAtt LambdaFunctionRole.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
@@ -1089,47 +1100,29 @@ Resources:
 
   LambdaRunnerDebug:
     Type: Custom::LambdaRunnerDebug
-    DependsOn: LambdaFunctionDebug
+    DependsOn: LambdaDebug
     Properties:
-      ClusterId: !Ref EcsCluster
-      Iteration: 1
-      TaskDefinition: !Ref LambdaFunctionDebug
-      ServiceToken: !GetAtt LambdaFunctionDebug.Arn
-      Region: !Ref "AWS::Region"
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref EcsSecurityGroup
-          Subnets:
-            - !Ref Ec2SubnetPublic1
-            - !Ref Ec2SubnetPublic2
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref EcsSecurityGroup
-        SubnetIds:
-          - !Ref Ec2SubnetPublic1
-          - !Ref Ec2SubnetPublic2
+      ServiceToken: !GetAtt LambdaDebug.Arn
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-runner"
 
-  LambdaRunnerInitEfs:
+  LambdaRunner1:
     DependsOn:
-     - EcsCluster
-     - EcsTaskDefinitionInitEfs
+     - ECSCluster
+     - ECSTaskDefinitionInitEfs
      - EcsSecurityGroup
      - EfsFileSystem
      - EfsMountTarget1
      - EfsMountTarget2
      - LambdaFunctionRunTaskAndWait
-     - Ec2SubnetPublic1
-     - Ec2SubnetPublic2
+     - PubSubnetAz1
+     - PubSubnetAz2
     Properties:
-      ClusterId: !Ref EcsCluster
+      ClusterId: !Ref ECSCluster
       RunTaskParameters:
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
-        cluster: !Ref EcsCluster
+        cluster: !Ref ECSCluster
         count: 1
         launchType: FARGATE
         networkConfiguration:
@@ -1138,15 +1131,15 @@ Resources:
             securityGroups:
               - !Ref EcsSecurityGroup
             subnets:
-              - !Ref Ec2SubnetPublic1
-              - !Ref Ec2SubnetPublic2
+              - !Ref PubSubnetAz1
+              - !Ref PubSubnetAz2
         platformVersion: 1.4.0
         tags:
           - key: Name
-            value: !Sub "${AWS::StackName}-lambda-init-efs"
-        taskDefinition: !Ref EcsTaskDefinitionInitEfs
+            value: !Sub "${AWS::StackName}-lambda-runner-1"
+        taskDefinition: !Ref ECSTaskDefinitionInitEfs
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
-    Type: Custom::LambdaRunnerInitEfs
+    Type: Custom::LambdaRunner1
 
 # -----------------------------------------------------------------------------
 # Outputs
@@ -1155,20 +1148,20 @@ Resources:
 
 Outputs:
 
-  Ec2Vpc:
+  Vpc:
     Description: The ID of the VPC
-    Value: !Ref Ec2Vpc
+    Value: !Ref Vpc
     Export:
       Name: !Sub "${AWS::StackName}-VpcId"
 
   Subnet1:
     Description: The ID of subnet 1
-    Value: !Ref Ec2SubnetPublic1
+    Value: !Ref PubSubnetAz1
     Export:
       Name: !Sub "${AWS::StackName}-Subnet1"
 
   Subnet2:
     Description: The ID of subnet 2
-    Value: !Ref Ec2SubnetPublic2
+    Value: !Ref PubSubnetAz2
     Export:
       Name: !Sub "${AWS::StackName}-Subnet2"
