@@ -610,14 +610,14 @@ Resources:
           User: "0"
       Cpu: 512
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      Family: !Sub "${AWS::StackName}-task-definition-yum"
+      Family: !Sub "${AWS::StackName}-task-definition-install-senzing"
       Memory: 4096
       NetworkMode: "awsvpc"
       RequiresCompatibilities:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
+          Value: !Sub "${AWS::StackName}-install-senzing"
       Volumes:
         -
           Name: "senzing-data-dir"
@@ -1107,7 +1107,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-run-and-wait"
-      Timeout: 120
+      Timeout: 600
 
 # -- Run ECS tasks-------------------------------------------------------------
 
@@ -1156,6 +1156,32 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionInitEfs
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInitEfs
+
+  LambdaRunnerInstallSenzing:
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: ENABLED
+            securityGroups:
+              - !Ref EcsSecurityGroup
+            subnets:
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-yum"
+        taskDefinition: !Ref EcsTaskDefinitionInstallSenzing
+      ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
+    Type: Custom::LambdaRunnerInstallSenzing
 
 # -----------------------------------------------------------------------------
 # Outputs
