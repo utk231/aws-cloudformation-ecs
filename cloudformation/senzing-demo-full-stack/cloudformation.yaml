@@ -126,7 +126,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
 
-  Vpc:
+  Ec2Vpc:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -162,7 +162,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-1"
-      VpcId: !Ref Vpc
+      VpcId: !Ref Ec2Vpc
 
 
   Ec2SubnetPublic2:
@@ -185,7 +185,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-2"
-      VpcId: !Ref Vpc
+      VpcId: !Ref Ec2Vpc
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
@@ -196,7 +196,7 @@ Resources:
       GroupDescription: ECS Allowed Ports
       VpcId: !If
         - CreateVpcResources
-        - !Ref Vpc
+        - !Ref Ec2Vpc
         - !Ref VpcId
       SecurityGroupIngress:
         -
@@ -275,7 +275,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
-  InternetGateway:
+  Ec2InternetGateway:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::InternetGateway'
     Properties:
@@ -285,12 +285,12 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
-  AttachGateway:
+  Ec2AttachGateway:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
-      VpcId: !Ref Vpc
-      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Ec2Vpc
+      InternetGatewayId: !Ref Ec2InternetGateway
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
 
@@ -298,7 +298,7 @@ Resources:
     Condition: CreateVpcResources
     Type: 'AWS::EC2::RouteTable'
     Properties:
-      VpcId: !Ref Vpc
+      VpcId: !Ref Ec2Vpc
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-route-table"
@@ -308,12 +308,12 @@ Resources:
   PublicRouteViaIgw:
     Condition: CreateVpcResources
     DependsOn:
-     - AttachGateway
+     - Ec2AttachGateway
     Type: 'AWS::EC2::Route'
     Properties:
       RouteTableId: !Ref RouteViaIgw
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      GatewayId: !Ref Ec2InternetGateway
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
 
@@ -390,16 +390,16 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbclusterparametergroup.html
 
-  RdsDbClusterParameterGroup:
-    Type: "AWS::RDS::DBClusterParameterGroup"
-    Properties:
-      Description: !Sub "${AWS::StackName}-db-cluster-parameter-group-description"
-      Family: "aurora-postgresql10"
-      Parameters:
-        "synchronous_commit": "off"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
+# RdsDbClusterParameterGroup:
+#   Type: "AWS::RDS::DBClusterParameterGroup"
+#   Properties:
+#     Description: !Sub "${AWS::StackName}-db-cluster-parameter-group-description"
+#     Family: "aurora-postgresql10"
+#     Parameters:
+#       "synchronous_commit": "off"
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
 
@@ -946,7 +946,7 @@ Resources:
 #         - !Ref Ec2SubnetPublic2
 
 
-  LambdaRunTask:
+  LambdaFunctionRunTask:
     Type: AWS::Lambda::Function
     Properties:
       Code:
@@ -1164,11 +1164,11 @@ Resources:
 
 Outputs:
 
-  Vpc:
+  Ec2Vpc:
     Description: The ID of the VPC
-    Value: !Ref Vpc
+    Value: !Ref Ec2Vpc
     Export:
-      Name: !Sub "${AWS::StackName}-VpcId"
+      Name: !Sub "${AWS::StackName}-ec2-VpcId"
 
 
   Subnet1:
