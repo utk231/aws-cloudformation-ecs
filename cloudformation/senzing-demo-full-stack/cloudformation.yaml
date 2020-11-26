@@ -637,8 +637,6 @@ Resources:
   EcsTaskDefinitionInitPostgres:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
       - RdsDbCluster
     Properties:
       ContainerDefinitions:
@@ -689,78 +687,77 @@ Resources:
             RootDirectory: "/g2"
 
 
-# ECSTaskDefinitionInitSenzing:
-#   Type: "AWS::ECS::TaskDefinition"
-#   DependsOn:
-#     - EfsMountTarget1
-#     - EfsMountTarget2
-#   Properties:
-#     ContainerDefinitions:
-#       -
-#         Environment:
-#           -
-#             Name: "SENZING_DATABASE_URL"
-#             Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-#         Essential: true
-#         Image: "senzing/init-container:1.5.9"
-#         LinuxParameters:
-#           Capabilities: {}
-#         LogConfiguration:
-#           LogDriver: "awslogs"
-#           Options:
-#             awslogs-group: !Sub "${AWS::StackName}-log-group"
-#             awslogs-region: !Ref AWS::Region
-#             awslogs-stream-prefix: "advanced"
-#         MountPoints:
-#           -
-#             SourceVolume: "senzing-data-version-dir"
-#             ContainerPath: "/opt/senzing/data"
-#             ReadOnly: false
-#           -
-#             SourceVolume: "senzing-etc-dir"
-#             ContainerPath: "/etc/opt/senzing"
-#             ReadOnly: false
-#           -
-#             SourceVolume: "senzing-g2-dir"
-#             ContainerPath: "/opt/senzing/g2"
-#             ReadOnly: false
-#         Name: "initcontainer"
-#         Privileged: false
-#         PseudoTerminal: false
-#         ReadonlyRootFilesystem: false
-#         User: "0"
-#     Cpu: 512
-#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-#     Family: !Sub "${AWS::StackName}-task-definition-init-container"
-#     Memory: 4096
-#     NetworkMode: "awsvpc"
-#     RequiresCompatibilities:
-#       - "FARGATE"
-#     Tags:
-#       - Key: Name
-#         Value: !Sub "${AWS::StackName}-init-efs"
-#     Volumes:
-#       -
-#         Name: "senzing-data-version-dir"
-#         EFSVolumeConfiguration:
-#             AuthorizationConfig: {}
-#             FilesystemId:
-#               Ref: EfsFileSystem
-#             RootDirectory: "/data/1.0.0"
-#       -
-#         Name: "senzing-etc-dir"
-#         EFSVolumeConfiguration:
-#             AuthorizationConfig: {}
-#             FilesystemId:
-#               Ref: EfsFileSystem
-#             RootDirectory: "/etc"
-#       -
-#         Name: "senzing-g2-dir"
-#         EFSVolumeConfiguration:
-#             AuthorizationConfig: {}
-#             FilesystemId:
-#               Ref: EfsFileSystem
-#             RootDirectory: "/g2"
+  EcsTaskDefinitionInitSenzing:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EcsTaskDefinitionInitPostgres
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_DATABASE_URL"
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: "senzing/init-container:1.5.9"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-version-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-etc-dir"
+              ContainerPath: "/etc/opt/senzing"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+          Name: "initcontainer"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+          User: "0"
+      Cpu: 512
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-init-senzing"
+      Memory: 4096
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+      Volumes:
+        -
+          Name: "senzing-data-version-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/data/1.0.0"
+        -
+          Name: "senzing-etc-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/etc"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/g2"
 
 
   EcsTaskDefinitionStreamProducer1:
@@ -1212,6 +1209,33 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionInitPostgres
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInitPostgres
+
+
+  LambdaRunnerInitSenzing:
+    DependsOn:
+     - LambdaRunnerInitPostgres
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: ENABLED
+            securityGroups:
+              - !Ref EcsSecurityGroup
+            subnets:
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
+        taskDefinition: !Ref EcsTaskDefinitionInitSenzing
+      ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
+    Type: Custom::LambdaRunnerInitSenzing
 
 # -----------------------------------------------------------------------------
 # Outputs
