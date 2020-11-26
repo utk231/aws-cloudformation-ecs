@@ -283,7 +283,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
 
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
 
   Ec2VpcGatewayAttachment:
     Condition: CreateVpcResources
@@ -507,7 +507,7 @@ Resources:
 #   Properties:
 #     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-and-wait"
 
-# -- Tasks --------------------------------------------------------------------
+# -- EcsTaskDefinition --------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
 
@@ -634,10 +634,12 @@ Resources:
               Ref: EfsFileSystem
             RootDirectory: "/g2"
 
+
   EcsTaskDefinitionInitPostgres:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
-      - RdsDbCluster
+      - EfsMountTarget1
+      - EfsMountTarget2
     Properties:
       ContainerDefinitions:
         -
@@ -690,7 +692,8 @@ Resources:
   EcsTaskDefinitionInitSenzing:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
-      - EcsTaskDefinitionInitPostgres
+      - EfsMountTarget1
+      - EfsMountTarget2
     Properties:
       ContainerDefinitions:
         -
@@ -760,7 +763,7 @@ Resources:
               RootDirectory: "/g2"
 
 
-  EcsTaskDefinitionStreamProducer1:
+  EcsTaskDefinitionStreamProducer:
     Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
@@ -857,7 +860,7 @@ Resources:
               RootDirectory: "/g2"
 
 
-# -- Lambda -------------------------------------------------------------------
+# -- Iam -----------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
@@ -902,6 +905,8 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
 
+# -- LambdaFunction -----------------------------------------------------------
+
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
   LambdaFunctionDebug:
@@ -936,12 +941,6 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-debug"
       Timeout: 2
-#     VpcConfig:
-#       SecurityGroupIds:
-#         - !Ref EcsSecurityGroup
-#       SubnetIds:
-#         - !Ref Ec2SubnetPublic1
-#         - !Ref Ec2SubnetPublic2
 
 
   LambdaFunctionRunTask:
@@ -973,8 +972,8 @@ Resources:
               try:
                   logger.info("Event: {0}".format(json.dumps(event)))
                   if event['RequestType'] in ['Create', 'Update']:
-                      properties = event['ResourceProperties']
-                      run_task_parameters = properties['RunTaskParameters']
+                      properties = event.get('ResourceProperties', {})
+                      run_task_parameters = properties.get('RunTaskParameters', {})
 
                       # Change strings to integers.
 
@@ -1022,7 +1021,6 @@ Resources:
           import datetime
           import json
           import logging
-          import time
           import traceback
           from json import JSONEncoder
 
@@ -1041,15 +1039,7 @@ Resources:
                   logger.info("Event: {0}".format(json.dumps(event)))
                   if event['RequestType'] in ['Create', 'Update']:
                       properties = event.get('ResourceProperties', {})
-                      delay_time_in_seconds = int(properties.get('Delay', 0))
                       run_task_parameters = properties.get('RunTaskParameters', {})
-
-                      # If requested, sleep.
-
-                      if delay_time_in_seconds > 0:
-                          logger.info("Sleeping {0} seconds".format(delay_time_in_seconds))
-                          time.sleep(delay_time_in_seconds)
-                          logger.info("Awake")
 
                       # Change strings to integers.
 
@@ -1062,27 +1052,22 @@ Resources:
 
                       # Make AWS ECS request.
 
-                      logger.info("1.0")
                       ecs = boto3.client('ecs')
                       response = ecs.run_task(**run_task_parameters)
-                      logger.info("Initial Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
                       # Wait for completion.
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#waiters
 
                       waiter = ecs.get_waiter('tasks_stopped')
-                      logger.info("1.1")
-
                       waiter.wait(
                           cluster=properties['ClusterId'],
                           tasks=[response['tasks'][0]['taskArn']],
                       )
-                      logger.info("1.2")
 
                       response['describe_task'] = ecs.describe_tasks(
                           cluster=properties['ClusterId'],
                           tasks=[response['tasks'][0]['taskArn']],
                       )
-                      logger.info("1.3")
                       logger.info("describe_task response: {0}".format(json.dumps(response['describe_task'], cls=DateTimeEncoder)))
 
                       exit_code = response.get('describe_task', {}).get('tasks', [{}])[0].get('containers', [{}])[0].get('exitCode', 99)
@@ -1123,15 +1108,9 @@ Resources:
 
   LambdaRunnerInitEfs:
     DependsOn:
-     - EcsCluster
-     - EcsTaskDefinitionInitEfs
-     - EcsSecurityGroup
      - EfsFileSystem
      - EfsMountTarget1
      - EfsMountTarget2
-     - LambdaFunctionRunTaskAndWait
-     - Ec2SubnetPublic1
-     - Ec2SubnetPublic2
     Properties:
       ClusterId: !Ref EcsCluster
       RunTaskParameters:
@@ -1236,6 +1215,36 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionInitSenzing
       ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
     Type: Custom::LambdaRunnerInitSenzing
+
+
+  LambdaRunnerStreamProducer:
+    DependsOn:
+     - EfsFileSystem
+     - EfsMountTarget1
+     - EfsMountTarget2
+     - SqsQueue
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: ENABLED
+            securityGroups:
+              - !Ref EcsSecurityGroup
+            subnets:
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
+        taskDefinition: !Ref EcsTaskDefinitionStreamProducer
+      ServiceToken: !GetAtt LambdaFunctionRunTask.Arn
+    Type: Custom::LambdaRunnerStreamProducer
 
 # -----------------------------------------------------------------------------
 # Outputs
