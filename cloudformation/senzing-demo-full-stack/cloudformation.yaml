@@ -52,6 +52,10 @@ Parameters:
     Description: "Required: URL to file of JSON records to be sent to AWS SQS queue."
     Type: String
 
+  SenzingLicenseAsBase64:
+    Description: "Optional: Senzing license as base64 encoded string."
+    Type: String
+
   SenzingRecordMax:
     Default: 100000
     Description: "Required: Last record to read from SenzingInputUrl. '0' means read to end of file."
@@ -701,6 +705,9 @@ Resources:
             -
               Name: "SENZING_DATABASE_URL"
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: "SENZING_LICENSE_BASE64"
+              Value: !Sub "${SenzingLicenseAsBase64}"
           Essential: true
           Image: "senzing/init-container:1.5.9"
           LinuxParameters:
@@ -859,6 +866,85 @@ Resources:
                 Ref: EfsFileSystem
               RootDirectory: "/g2"
 
+
+  EcsTaskDefinitionSshd:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Essential: true
+          Image: "senzing/sshd:1.0.2"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-version-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-etc-dir"
+              ContainerPath: "/etc/opt/senzing"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-var-dir"
+              ContainerPath: "/var/opt/senzing"
+              ReadOnly: false
+          Name: "sshd"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-sshd"
+      Memory: 8192
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-sshd"
+      Volumes:
+        -
+          Name: "senzing-data-version-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/data/1.0.0"
+        -
+          Name: "senzing-etc-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/etc"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/g2"
+        -
+          Name: "senzing-var-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/var"
 
 # -- Iam -----------------------------------------------------------------
 
@@ -1245,6 +1331,35 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionStreamProducer
       ServiceToken: !GetAtt LambdaFunctionRunTask.Arn
     Type: Custom::LambdaRunnerStreamProducer
+
+# -- EcsService ---------------------------------------------------------------
+
+  EcsServiceSshd:
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        NetworkConfiguration
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      PropagateTags: TASK_DEFINITION
+      ServiceName: sshd
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
+      TaskDefinition: !Ref EcsTaskDefinitionSshd
+    Type: AWS::ECS::Service
 
 # -----------------------------------------------------------------------------
 # Outputs
