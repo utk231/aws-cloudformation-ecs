@@ -706,10 +706,10 @@ Resources:
               Name: "SENZING_DATABASE_URL"
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
             -
-              Name: "SENZING_LICENSE_BASE64"
+              Name: "SENZING_LICENSE_BASE64_ENCODED"
               Value: !Sub "${SenzingLicenseAsBase64}"
           Essential: true
-          Image: "senzing/init-container:1.5.9"
+          Image: "senzing/init-container:1.6.3"
           LinuxParameters:
             Capabilities: {}
           LogConfiguration:
@@ -807,7 +807,7 @@ Resources:
               Name: "SENZING_RECORD_MIN"
               Value: !Sub "${SenzingRecordMin}"
           Essential: true
-          Image: "senzing/stream-producer:1.2.2"
+          Image: "senzing/stream-producer:1.2.3"
           LinuxParameters:
             Capabilities: {}
           LogConfiguration:
