@@ -475,6 +475,25 @@ Resources:
             - "Arn"
         maxReceiveCount: 100
 
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-policy.html
+
+  SqsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "SQS:SendMessage"
+              - "SQS:ReceiveMessage"
+            Effect: "Allow"
+            Resource: !GetAtt SqsQueue.Arn
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Queues:
+        - !Ref SqsQueue
+
 # -- ECS Cluster --------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
@@ -500,16 +519,6 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     Properties:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
-
-# LogsLogGroup2:
-#   Type: "AWS::Logs::LogGroup"
-#   Properties:
-#     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-debug"
-
-# LogsLogGroup3:
-#   Type: "AWS::Logs::LogGroup"
-#   Properties:
-#     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-and-wait"
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -806,6 +815,12 @@ Resources:
             -
               Name: "SENZING_RECORD_MIN"
               Value: !Sub "${SenzingRecordMin}"
+#            -
+#              Name: "AWS_ACCESS_KEY_ID"
+#              Value: !Ref IamAccessKeyLambda
+#            -
+#              Name: "AWS_SECRET_ACCESS_KEY"
+#              Value: !GetAtt IamAccessKeyLambda.SecretAccessKey
           Essential: true
           Image: "senzing/stream-producer:1.2.3"
           LinuxParameters:
@@ -948,6 +963,10 @@ Resources:
 
 # -- Iam -----------------------------------------------------------------
 
+#  IamAccessKeyLambda:
+#    Type: AWS::IAM::AccessKey
+#    Properties:
+
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
   IamRoleLambda:
@@ -960,6 +979,7 @@ Resources:
           Principal:
             Service:
               - lambda.amazonaws.com
+              - sqs.amazonaws.com
           Action:
             - sts:AssumeRole
       Path: "/"
@@ -969,16 +989,17 @@ Resources:
           Version: '2012-10-17'
           Statement:
           - Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-              - ec2:DescribeNetworkInterfaces
+              - ec2:AttachNetworkInterface
               - ec2:CreateNetworkInterface
               - ec2:DeleteNetworkInterface
               - ec2:DescribeInstances
-              - ec2:AttachNetworkInterface
+              - ec2:DescribeNetworkInterfaces
               - ecs:DescribeTasks
               - ecs:RunTask
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - sqs:SendMessage
             Effect: Allow
             Resource: '*'
           - Action:
@@ -1028,6 +1049,49 @@ Resources:
           Value: !Sub "${AWS::StackName}-lambda-debug"
       Timeout: 2
 
+
+  LambdaFunctionSleeper:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import cfnresponse
+          import json
+          import logging
+          import time
+          import traceback
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      sleep_time_in_seconds = int(properties.get('SleepTimeInSeconds', 0))
+                      logger.info("Sleeping {0} seconds.".format(sleep_time_in_seconds))
+                      time.sleep(sleep_time_in_seconds)
+                      logger.info("Awake.")
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, {})
+
+      Description: Sleeps for a period of time
+      FunctionName: !Sub "${AWS::StackName}-lambda-sleep"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-sleep"
+      Timeout: 600
 
   LambdaFunctionRunTask:
     Type: AWS::Lambda::Function
@@ -1137,6 +1201,7 @@ Resources:
                               run_task_parameters[number] = int(run_task_parameters[number])
 
                       # Make AWS ECS request.
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
 
                       ecs = boto3.client('ecs')
                       response = ecs.run_task(**run_task_parameters)
@@ -1178,6 +1243,24 @@ Resources:
           Value: !Sub "${AWS::StackName}-lambda-run-and-wait"
       Timeout: 600
 
+# -- Wait for backing services to come up -------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-waitconditionhandle.html
+
+# WaitConditionHandle:
+#   Type: AWS::CloudFormation::WaitConditionHandle
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-waitcondition.html
+
+# WaitConditionEfs:
+#   Type: AWS::CloudFormation::WaitCondition
+#   DependsOn:
+#     - EfsMountTarget1
+#     - EfsMountTarget2
+#   Properties:
+#     Handle: !Ref WaitConditionHandle
+#     Timeout: 600
+
 # -- Run ECS tasks-------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
@@ -1192,11 +1275,19 @@ Resources:
     Type: Custom::LambdaRunnerDebug
 
 
+  LambdaRunnerSleeper:
+    Properties:
+      ServiceToken: !GetAtt LambdaFunctionSleeper.Arn
+      SleepTimeInSeconds: 180
+    Type: Custom::LambdaRunnerSleeper
+
+
   LambdaRunnerInitEfs:
     DependsOn:
      - EfsFileSystem
      - EfsMountTarget1
      - EfsMountTarget2
+     - LambdaRunnerSleeper
     Properties:
       ClusterId: !Ref EcsCluster
       RunTaskParameters:
@@ -1309,6 +1400,7 @@ Resources:
      - EfsMountTarget1
      - EfsMountTarget2
      - SqsQueue
+     - LambdaRunnerSleeper
     Properties:
       ClusterId: !Ref EcsCluster
       RunTaskParameters:
