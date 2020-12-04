@@ -1,0 +1,637 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+
+Description: >-
+  Senzing formation for AWS FARGATE...
+
+# -----------------------------------------------------------------------------
+# Parameters
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+# -----------------------------------------------------------------------------
+
+Parameters:
+
+  AcceptEula:
+    AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
+    ConstraintDescription: >-
+      AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
+    Description: >-
+      Required: If you accept the Senzing End User License Agreements at
+      https://senzing.com/end-user-license-agreement,
+      enter `I_ACCEPT_THE_SENZING_EULA`.
+    Type: String
+
+  DbUsername:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+    Default: senzing
+    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+
+  DbPassword:
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: Must contain only alphanumeric characters.
+    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+
+  SecurityGroupIds:
+    Default: ''
+    Description: >-
+      Optional: Existing security group to associate the container instances.
+      Creates one by default.
+    Type: CommaDelimitedList
+
+  SenzingInputUrl:
+    Default: "https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz"
+    Description: "Required: URL to file of JSON records to be sent to AWS SQS queue."
+    Type: String
+
+  SenzingLicenseAsBase64:
+    Description: "Optional: Senzing license as base64 encoded string."
+    Type: String
+
+  SenzingRecordMax:
+    Default: 100000
+    Description: "Required: Last record to read from SenzingInputUrl. '0' means read to end of file."
+    Type: Number
+
+  SenzingRecordMin:
+    Default: 0
+    Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
+    Type: Number
+
+  VpcAvailabilityZones:
+    Default: ''
+    Description: >-
+      Optional: Comma-delimited list of VPC availability zones in which to
+      create subnets.  Required if setting VpcId.
+    Type: CommaDelimitedList
+
+  VpcId:
+    AllowedPattern: '^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$'
+    ConstraintDescription: >-
+      VPC Id must begin with 'vpc-' followed by either an 8 or 17 character
+      identifier, or leave blank to have a new VPC created
+    Default: ''
+    Description: "Optional: VPC Id of existing VPC. Leave blank to have a new VPC created."
+    Type: String
+
+# -----------------------------------------------------------------------------
+# Mappings
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+# -----------------------------------------------------------------------------
+
+Mappings:
+
+  VpcCidrs:
+    vpc:
+      cidr: 10.0.0.0/16
+    pubsubnet1:
+      cidr: 10.0.0.0/24
+    pubsubnet2:
+      cidr: 10.0.1.0/24
+
+# -----------------------------------------------------------------------------
+# Conditions
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html
+# -----------------------------------------------------------------------------
+
+Conditions:
+
+  CreateSecurityGroup: !Equals
+    - !Join
+      - ''
+      - !Ref SecurityGroupIds
+    - ''
+
+  CreateVpcResources: !Equals
+    - !Ref VpcId
+    - ''
+
+  UseSpecifiedVpcAvailabilityZones: !Not
+    - !Equals
+      - !Join
+        - ''
+        - !Ref VpcAvailabilityZones
+      - ''
+
+# -----------------------------------------------------------------------------
+# Resources
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+# -----------------------------------------------------------------------------
+
+Resources:
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+
+  Ec2Vpc:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - vpc
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-vpc"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+
+  Ec2SubnetPublic1:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !If
+        - UseSpecifiedVpcAvailabilityZones
+        - !Select
+          - '0'
+          - !Ref VpcAvailabilityZones
+        - !Select
+          - '0'
+          - !GetAZs
+            Ref: 'AWS::Region'
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet1
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-1"
+      VpcId: !Ref Ec2Vpc
+
+
+  Ec2SubnetPublic2:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !If
+        - UseSpecifiedVpcAvailabilityZones
+        - !Select
+          - '1'
+          - !Ref VpcAvailabilityZones
+        - !Select
+          - '1'
+          - !GetAZs
+            Ref: 'AWS::Region'
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet2
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-2"
+      VpcId: !Ref Ec2Vpc
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+
+  EcsSecurityGroup:
+    Condition: CreateSecurityGroup
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+      SecurityGroupIngress:
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: HTTP
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: HTTPS
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: NFS
+          FromPort: 2049
+          IpProtocol: tcp
+          ToPort: 2049
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing X-Term
+          FromPort: 5000
+          IpProtocol: tcp
+          ToPort: 5000
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: PostgreSQL
+          FromPort: 5432
+          IpProtocol: tcp
+          ToPort: 5432
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing API server
+          FromPort: 8250
+          IpProtocol: tcp
+          ToPort: 8250
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing Web App
+          FromPort: 8251
+          IpProtocol: tcp
+          ToPort: 8251
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Swagger UI
+          FromPort: 8080
+          IpProtocol: tcp
+          ToPort: 8080
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: Senzing Jupyter notebooks
+          FromPort: 8888
+          IpProtocol: tcp
+          ToPort: 8888
+        -
+          CidrIp: "0.0.0.0/0"
+          Description: phpPgAdmin
+          FromPort: 9171
+          IpProtocol: tcp
+          ToPort: 9171
+      SecurityGroupEgress:
+        -
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+
+  Ec2InternetGateway:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
+
+  Ec2VpcGatewayAttachment:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      InternetGatewayId: !Ref Ec2InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+
+  Ec2RouteTable:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table"
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+
+  Ec2Route:
+    Condition: CreateVpcResources
+    DependsOn:
+     - Ec2VpcGatewayAttachment
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref Ec2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Ec2InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+
+  Ec2SubnetRouteTableAssociation1:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref Ec2SubnetPublic1
+      RouteTableId: !Ref Ec2RouteTable
+
+
+  Ec2SubnetRouteTableAssociation2:
+    Condition: CreateVpcResources
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref Ec2SubnetPublic2
+      RouteTableId: !Ref Ec2RouteTable
+
+# -- Queue --------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
+
+  SqsQueueDeadLetter:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      DelaySeconds: "0"
+      MaximumMessageSize: "262144"
+      MessageRetentionPeriod: "1209600"
+      ReceiveMessageWaitTimeSeconds: "0"
+      VisibilityTimeout: "30"
+      QueueName: !Sub "${AWS::StackName}-sqs-dead-letter-queue"
+
+
+  SqsQueue:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      DelaySeconds: "0"
+      MaximumMessageSize: "262144"
+      MessageRetentionPeriod: "1209600"
+      ReceiveMessageWaitTimeSeconds: "0"
+      VisibilityTimeout: "300"
+      QueueName: !Sub "${AWS::StackName}-sqs-queue"
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - "SqsQueueDeadLetter"
+            - "Arn"
+        maxReceiveCount: 100
+
+# -- ECS Cluster --------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
+
+  EcsCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      ClusterSettings:
+        -
+          Name: "containerInsights"
+          Value: "disabled"
+
+# -- Authentication -----------------------------------------------------------
+
+# TODO: Needed for stream-producer.
+
+# -- Logging ------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
+
+  LogsLogGroup1:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
+
+# -- EcsTaskDefinition --------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+
+  EcsTaskDefinitionStreamProducer:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: "SENZING_READ_QUEUE_MAXSIZE"
+              Value: "200"
+            -
+              Name: "SENZING_THREADS_PER_PRINT"
+              Value: "30"
+            -
+              Name: "SENZING_RECORD_MAX"
+              Value: !Sub "${SenzingRecordMax}"
+            -
+              Name: "SENZING_INPUT_URL"
+              Value: !Sub "${SenzingInputUrl}"
+            -
+              Name: "SENZING_SQS_QUEUE_URL"
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
+            -
+              Name: "SENZING_RECORD_MONITOR"
+              Value: "100000"
+            -
+              Name: "SENZING_MONITORING_PERIOD_IN_SECONDS"
+              Value: "60"
+            -
+              Name: "SENZING_SUBCOMMAND"
+              Value: "gzipped-json-to-sqs-batch"
+            -
+              Name: "SENZING_RECORD_MIN"
+              Value: !Sub "${SenzingRecordMin}"
+#            -
+#              Name: "AWS_ACCESS_KEY_ID"
+#              Value: !Ref IamAccessKeyLambda
+#            -
+#              Name: "AWS_SECRET_ACCESS_KEY"
+#              Value: !GetAtt IamAccessKeyLambda.SecretAccessKey
+          Essential: true
+          Image: "senzing/stream-producer:1.2.3"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          Name: "producer1"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-stream-producer-1"
+      Memory: 8192
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-init-efs"
+
+# -- Iam -----------------------------------------------------------------
+
+#  IamAccessKeyLambda:
+#    Type: AWS::IAM::AccessKey
+#    Properties:
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+              - sqs.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: LambdaFunctionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+              - ec2:AttachNetworkInterface
+              - ec2:CreateNetworkInterface
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeInstances
+              - ec2:DescribeNetworkInterfaces
+              - ecs:DescribeTasks
+              - ecs:RunTask
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - sqs:SendMessage
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+
+# -- LambdaFunction -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
+
+  LambdaFunctionRunTask:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import cfnresponse
+          import datetime
+          import json
+          import logging
+          import traceback
+          from json import JSONEncoder
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          class DateTimeEncoder(JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, (datetime.date, datetime.datetime)):
+                      return obj.isoformat()
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      run_task_parameters = properties.get('RunTaskParameters', {})
+
+                      # Change strings to integers.
+
+                      numbers = [
+                          "count",
+                      ]
+                      for number in numbers:
+                          if number in run_task_parameters:
+                              run_task_parameters[number] = int(run_task_parameters[number])
+
+                      # Make AWS ECS request.
+
+                      ecs = boto3.client('ecs')
+                      response = ecs.run_task(**run_task_parameters)
+
+                  logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
+
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, {})
+
+      Description: Runs an ECS task
+      FunctionName: !Sub "${AWS::StackName}-lambda-run"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-run"
+      Timeout: 30
+
+# -- Wait for backing services to come up -------------------------------------
+
+  LambdaRunnerStreamProducer:
+    DependsOn:
+     - SqsQueue
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: ENABLED
+            securityGroups:
+              - !Ref EcsSecurityGroup
+            subnets:
+              - !Ref Ec2SubnetPublic1
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
+        taskDefinition: !Ref EcsTaskDefinitionStreamProducer
+      ServiceToken: !GetAtt LambdaFunctionRunTask.Arn
+    Type: Custom::LambdaRunnerStreamProducer
+
+# -----------------------------------------------------------------------------
+# Outputs
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  Ec2Vpc:
+    Description: The ID of the VPC
+    Value: !Ref Ec2Vpc
+    Export:
+      Name: !Sub "${AWS::StackName}-ec2-VpcId"
+
+
+  Subnet1:
+    Description: The ID of subnet 1
+    Value: !Ref Ec2SubnetPublic1
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet1"
+
+
+  Subnet2:
+    Description: The ID of subnet 2
+    Value: !Ref Ec2SubnetPublic2
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet2"
