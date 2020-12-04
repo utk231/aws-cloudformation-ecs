@@ -12,34 +12,6 @@ Description: >-
 
 Parameters:
 
-  AcceptEula:
-    AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
-    ConstraintDescription: >-
-      AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
-    Description: >-
-      Required: If you accept the Senzing End User License Agreements at
-      https://senzing.com/end-user-license-agreement,
-      enter `I_ACCEPT_THE_SENZING_EULA`.
-    Type: String
-
-  DbUsername:
-    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
-    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
-    Default: senzing
-    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
-    MaxLength: '16'
-    MinLength: '1'
-    Type: String
-
-  DbPassword:
-    AllowedPattern: '[a-zA-Z0-9]*'
-    ConstraintDescription: Must contain only alphanumeric characters.
-    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
-    MaxLength: '41'
-    MinLength: '8'
-    NoEcho: 'true'
-    Type: String
-
   SecurityGroupIds:
     Default: ''
     Description: >-
@@ -50,10 +22,6 @@ Parameters:
   SenzingInputUrl:
     Default: "https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz"
     Description: "Required: URL to file of JSON records to be sent to AWS SQS queue."
-    Type: String
-
-  SenzingLicenseAsBase64:
-    Description: "Optional: Senzing license as base64 encoded string."
     Type: String
 
   SenzingRecordMax:
