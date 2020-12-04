@@ -373,6 +373,16 @@ Resources:
       SubnetId:
         Ref: Ec2SubnetPublic2
 
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-accesspoint.html
+
+# EfsAccessPoint:
+#   Type: AWS::EFS::AccessPoint
+#   Properties:
+#     ClientToken: !Sub "${AWS::StackName}-efs-access-point"
+#     FileSystemId: !Ref EfsFileSystem
+#     RootDirectory:
+#       Path: "/efs0"
+
 # -- Database -----------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbsubnet-group.html
@@ -477,22 +487,22 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-policy.html
 
-  SqsQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - "SQS:SendMessage"
-              - "SQS:ReceiveMessage"
-            Effect: "Allow"
-            Resource: !GetAtt SqsQueue.Arn
-            Principal:
-              AWS:
-                - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      Queues:
-        - !Ref SqsQueue
+# SqsQueuePolicy:
+#   Type: AWS::SQS::QueuePolicy
+#   Properties:
+#     PolicyDocument:
+#       Statement:
+#         -
+#           Action:
+#             - "SQS:SendMessage"
+#             - "SQS:ReceiveMessage"
+#           Effect: "Allow"
+#           Resource: !GetAtt SqsQueue.Arn
+#           Principal:
+#             AWS:
+#               - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+#     Queues:
+#       - !Ref SqsQueue
 
 # -- ECS Cluster --------------------------------------------------------------
 
@@ -1093,6 +1103,62 @@ Resources:
           Value: !Sub "${AWS::StackName}-lambda-sleep"
       Timeout: 600
 
+# LambdaFunctionInitEfs:
+#   Type: AWS::Lambda::Function
+#   DependsOn:
+#     - EfsMountTarget1
+#     - EfsMountTarget2
+#   Properties:
+#     Code:
+#       ZipFile: |
+#         #!/usr/bin/env python3
+#
+#         import cfnresponse
+#         import json
+#         import logging
+#         import time
+#         import os
+#         import traceback
+#
+#         logger = logging.getLogger()
+#         logger.setLevel(logging.INFO)
+#
+#         def handler(event, context):
+#             result = cfnresponse.SUCCESS
+#             try:
+#                 logger.info("Event: {0}".format(json.dumps(event)))
+#                 if event['RequestType'] in ['Create', 'Update']:
+#                     os.makedirs('/mnt/efs0/data/1.0.0', exist_ok=True)
+#                     os.makedirs('/mnt/efs0/etc', exist_ok=True)
+#                     os.makedirs('/mnt/efs0/g2', exist_ok=True)
+#                     os.makedirs('/mnt/efs0/var', exist_ok=True)
+#             except Exception as e:
+#                 logger.error(e)
+#                 traceback.print_exc()
+#                 result = cfnresponse.FAILED
+#             finally:
+#                 cfnresponse.send(event, context, result, {})
+#
+#     Description: Create subdirectories on EFS
+#     FileSystemConfigs:
+#       -
+#         Arn: !GetAtt EfsAccessPoint.Arn
+#         LocalMountPath: "/mnt/efs0"
+#     FunctionName: !Sub "${AWS::StackName}-lambda-init-efs"
+#     Handler: index.handler
+#     Role: !GetAtt IamRoleLambda.Arn
+#     Runtime: python3.8
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-lambda-init-efs"
+#     Timeout: 300
+#     VpcConfig:
+#       SecurityGroupIds:
+#         - !Ref EcsSecurityGroup
+#       SubnetIds:
+#         - !Ref Ec2SubnetPublic1
+#         - !Ref Ec2SubnetPublic2
+
   LambdaFunctionRunTask:
     Type: AWS::Lambda::Function
     Properties:
@@ -1265,14 +1331,14 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
 
-  LambdaRunnerDebug:
-    DependsOn: LambdaFunctionDebug
-    Properties:
-      ServiceToken: !GetAtt LambdaFunctionDebug.Arn
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-runner-debug"
-    Type: Custom::LambdaRunnerDebug
+# LambdaRunnerDebug:
+#   DependsOn: LambdaFunctionDebug
+#   Properties:
+#     ServiceToken: !GetAtt LambdaFunctionDebug.Arn
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-lambda-runner-debug"
+#   Type: Custom::LambdaRunnerDebug
 
 
   LambdaRunnerSleeper:
@@ -1280,6 +1346,15 @@ Resources:
       ServiceToken: !GetAtt LambdaFunctionSleeper.Arn
       SleepTimeInSeconds: 180
     Type: Custom::LambdaRunnerSleeper
+
+
+# LambdaRunnerInitEfs:
+#   DependsOn:
+#     - EfsMountTarget1
+#     - EfsMountTarget2
+#   Properties:
+#     ServiceToken: !GetAtt LambdaFunctionInitEfs.Arn
+#   Type: Custom::LambdaRunnerInitEfs
 
 
   LambdaRunnerInitEfs:
@@ -1435,8 +1510,6 @@ Resources:
       EnableECSManagedTags: true
       LaunchType: FARGATE
       NetworkConfiguration:
-        NetworkConfiguration
-      NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
@@ -1445,7 +1518,6 @@ Resources:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
       PlatformVersion: 1.4.0
-      PropagateTags: TASK_DEFINITION
       ServiceName: sshd
       Tags:
         - Key: Name
