@@ -1590,6 +1590,8 @@ Resources:
 
 # -- EcsService ---------------------------------------------------------------
 
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
+
   EcsServiceSshd:
     DependsOn:
      - LambdaRunnerInitEfs
@@ -1639,6 +1641,39 @@ Resources:
       TaskDefinition: !Ref EcsTaskDefinitionStreamLoader
     Type: AWS::ECS::Service
 
+# -- AutoScaling --------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-applicationautoscaling-scalabletarget.html
+
+  ApplicationAutoScalingScalableTarget:
+    Properties:
+      MaxCapacity: 100
+      MinCapacity: 1
+      ResourceId: !Sub "service/${EcsCluster}/${EcsServiceStreamLoader.Name}"
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+#     RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ScalableDimension: "ecs:service:DesiredCount"
+      ServiceNamespace: "ecs"
+      SuspendedState:
+        DynamicScalingInSuspended: false
+        DynamicScalingOutSuspended: false
+        ScheduledScalingSuspended: false
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-applicationautoscaling-scalingpolicy.html
+
+  ApplicationAutoScalingScalingPolicy:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-scaling-policy-stream-loader"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ApplicationAutoScalingScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 1200
+        ScaleOutCooldown: 300
+        TargetValue: 30
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
 
 # -----------------------------------------------------------------------------
 # Outputs
