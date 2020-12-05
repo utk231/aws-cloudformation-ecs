@@ -825,12 +825,6 @@ Resources:
             -
               Name: "SENZING_RECORD_MIN"
               Value: !Sub "${SenzingRecordMin}"
-#            -
-#              Name: "AWS_ACCESS_KEY_ID"
-#              Value: !Ref IamAccessKeyLambda
-#            -
-#              Name: "AWS_SECRET_ACCESS_KEY"
-#              Value: !GetAtt IamAccessKeyLambda.SecretAccessKey
           Essential: true
           Image: "senzing/stream-producer:1.2.3"
           LinuxParameters:
@@ -857,6 +851,129 @@ Resources:
           Value: !Sub "${AWS::StackName}-init-efs"
       TaskRoleArn: !GetAtt IamRoleLambda.Arn
 
+
+  EcsTaskDefinitionStreamLoader:
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_DATA_SOURCE
+              Value: TEST
+            -
+              Name: SENZING_DELAY_IN_SECONDS
+              Value: 900
+            -
+              Name: SENZING_DELAY_RANDOMIZED
+              Value: "true"
+            -
+              Name: SENZING_ENTITY_TYPE
+              Value: GENERIC
+            -
+              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
+              Value: 600
+            -
+              Name: SENZING_GOVERNOR_DATABASE_URLS
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_LOG_LEVEL
+              Value: info
+            -
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: 600
+            -
+              Name: SENZING_PRIME_ENGINE
+              Value: "true"
+            -
+              Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
+              Value: "true"
+            -
+              Name: SENZING_SQS_QUEUE_URL
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: sqs
+            -
+              Name: SENZING_THREADS_PER_PROCESS
+              Value: 8
+          Essential: true
+          Image: "senzing/stream-loader:1.6.5"
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "advanced"
+          MountPoints:
+            -
+              SourceVolume: "senzing-data-version-dir"
+              ContainerPath: "/opt/senzing/data"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-etc-dir"
+              ContainerPath: "/etc/opt/senzing"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-g2-dir"
+              ContainerPath: "/opt/senzing/g2"
+              ReadOnly: false
+            -
+              SourceVolume: "senzing-var-dir"
+              ContainerPath: "/var/opt/senzing"
+              ReadOnly: false
+          Name: "stream-loader"
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
+      Memory: 8192
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-stream-loader"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+      Volumes:
+        -
+          Name: "senzing-data-version-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/data/1.0.0"
+        -
+          Name: "senzing-etc-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/etc"
+        -
+          Name: "senzing-g2-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/g2"
+        -
+          Name: "senzing-var-dir"
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: "/var"
 
 
   EcsTaskDefinitionSshd:
@@ -978,7 +1095,10 @@ Resources:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
+              - sqs:ReceiveMessage
               - sqs:SendMessage
+              - sqs:DeleteMessage
+              - sqs:*
             Effect: Allow
             Resource: '*'
           - Action:
@@ -1493,6 +1613,32 @@ Resources:
           Value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
       TaskDefinition: !Ref EcsTaskDefinitionSshd
     Type: AWS::ECS::Service
+
+
+  EcsServiceStreamLoader:
+    DependsOn:
+     - LambdaRunnerInitSenzing
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: stream-loader
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-stream-loader"
+      TaskDefinition: !Ref EcsTaskDefinitionStreamLoader
+    Type: AWS::ECS::Service
+
 
 # -----------------------------------------------------------------------------
 # Outputs
