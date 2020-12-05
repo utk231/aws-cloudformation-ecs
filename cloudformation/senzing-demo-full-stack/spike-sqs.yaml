@@ -383,6 +383,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-init-efs"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
 
 # -- Iam -----------------------------------------------------------------
 
@@ -401,6 +402,7 @@ Resources:
         - Effect: Allow
           Principal:
             Service:
+              - ecs-tasks.amazonaws.com
               - lambda.amazonaws.com
               - sqs.amazonaws.com
           Action:
@@ -419,6 +421,7 @@ Resources:
               - ec2:DescribeNetworkInterfaces
               - ecs:DescribeTasks
               - ecs:RunTask
+              - iam:PassRole
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
