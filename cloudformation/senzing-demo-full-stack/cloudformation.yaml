@@ -19,7 +19,7 @@ Parameters:
     Description: >-
       Required: If you accept the Senzing End User License Agreements at
       https://senzing.com/end-user-license-agreement,
-      enter `I_ACCEPT_THE_SENZING_EULA`.
+      enter 'I_ACCEPT_THE_SENZING_EULA'.
     Type: String
 
   DbUsername:
@@ -27,8 +27,8 @@ Parameters:
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
     Default: senzing
     Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
-    MaxLength: '16'
-    MinLength: '1'
+    MaxLength: 16
+    MinLength: 1
     Type: String
 
   DbPassword:
@@ -132,17 +132,17 @@ Resources:
 
   Ec2Vpc:
     Condition: CreateVpcResources
-    Type: 'AWS::EC2::VPC'
     Properties:
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
       CidrBlock: !FindInMap
         - VpcCidrs
         - vpc
         - cidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-vpc"
+    Type: AWS::EC2::VPC
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
 
@@ -583,7 +583,7 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
       Volumes:
         -
           Name: "senzing-efs-root"
@@ -640,7 +640,7 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-install-senzing"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-install-senzing"
       Volumes:
         -
           Name: "senzing-data-dir"
@@ -701,7 +701,7 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-init-postgres"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-postgres"
       Volumes:
         -
           Name: "senzing-g2-dir"
@@ -764,7 +764,7 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
       Volumes:
         -
           Name: "senzing-data-version-dir"
@@ -790,7 +790,7 @@ Resources:
 
 
   EcsTaskDefinitionStreamProducer:
-    Type: "AWS::ECS::TaskDefinition"
+    Type: AWS::ECS::TaskDefinition
     DependsOn:
       - EfsMountTarget1
       - EfsMountTarget2
@@ -799,34 +799,34 @@ Resources:
         -
           Environment:
             -
-              Name: "SENZING_READ_QUEUE_MAXSIZE"
-              Value: "200"
+              Name: SENZING_READ_QUEUE_MAXSIZE
+              Value: 200
             -
-              Name: "SENZING_THREADS_PER_PRINT"
-              Value: "30"
+              Name: SENZING_THREADS_PER_PRINT
+              Value: 30
             -
-              Name: "SENZING_RECORD_MAX"
+              Name: SENZING_RECORD_MAX
               Value: !Sub "${SenzingRecordMax}"
             -
-              Name: "SENZING_INPUT_URL"
+              Name: SENZING_INPUT_URL
               Value: !Sub "${SenzingInputUrl}"
             -
-              Name: "SENZING_SQS_QUEUE_URL"
+              Name: SENZING_SQS_QUEUE_URL
               Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
             -
-              Name: "SENZING_RECORD_MONITOR"
-              Value: "100000"
+              Name: SENZING_RECORD_MONITOR
+              Value: 100000
             -
-              Name: "SENZING_MONITORING_PERIOD_IN_SECONDS"
-              Value: "60"
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: 60
             -
-              Name: "SENZING_SUBCOMMAND"
-              Value: "gzipped-json-to-sqs-batch"
+              Name: SENZING_SUBCOMMAND
+              Value: gzipped-json-to-sqs-batch
             -
-              Name: "SENZING_RECORD_MIN"
+              Name: SENZING_RECORD_MIN
               Value: !Sub "${SenzingRecordMin}"
           Essential: true
-          Image: "senzing/stream-producer:1.2.3"
+          Image: senzing/stream-producer:1.2.3
           LinuxParameters:
             Capabilities: {}
           LogConfiguration:
@@ -835,7 +835,7 @@ Resources:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: "advanced"
-          Name: "producer1"
+          Name: producer1
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
@@ -848,12 +848,11 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-init-efs"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-producer"
       TaskRoleArn: !GetAtt IamRoleLambda.Arn
 
 
   EcsTaskDefinitionStreamLoader:
-    Type: "AWS::ECS::TaskDefinition"
     DependsOn:
       - EfsMountTarget1
       - EfsMountTarget2
@@ -872,7 +871,7 @@ Resources:
               Value: 900
             -
               Name: SENZING_DELAY_RANDOMIZED
-              Value: "true"
+              Value: true
             -
               Name: SENZING_ENTITY_TYPE
               Value: GENERIC
@@ -890,10 +889,10 @@ Resources:
               Value: 600
             -
               Name: SENZING_PRIME_ENGINE
-              Value: "true"
+              Value: true
             -
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
-              Value: "true"
+              Value: true
             -
               Name: SENZING_SQS_QUEUE_URL
               Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
@@ -904,33 +903,33 @@ Resources:
               Name: SENZING_THREADS_PER_PROCESS
               Value: 8
           Essential: true
-          Image: "senzing/stream-loader:1.6.5"
+          Image: senzing/stream-loader:1.6.5
           LinuxParameters:
             Capabilities: {}
           LogConfiguration:
-            LogDriver: "awslogs"
+            LogDriver: awslogs
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "advanced"
+              awslogs-stream-prefix: advanced
           MountPoints:
             -
-              SourceVolume: "senzing-data-version-dir"
-              ContainerPath: "/opt/senzing/data"
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
               ReadOnly: false
             -
-              SourceVolume: "senzing-etc-dir"
-              ContainerPath: "/etc/opt/senzing"
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
               ReadOnly: false
             -
-              SourceVolume: "senzing-g2-dir"
-              ContainerPath: "/opt/senzing/g2"
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
               ReadOnly: false
             -
-              SourceVolume: "senzing-var-dir"
-              ContainerPath: "/var/opt/senzing"
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
               ReadOnly: false
-          Name: "stream-loader"
+          Name: stream-loader
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
@@ -938,42 +937,149 @@ Resources:
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
       Memory: 8192
-      NetworkMode: "awsvpc"
+      NetworkMode: awsvpc
       RequiresCompatibilities:
-        - "FARGATE"
+        - FARGATE
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-stream-loader"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-loader"
       TaskRoleArn: !GetAtt IamRoleLambda.Arn
       Volumes:
         -
-          Name: "senzing-data-version-dir"
+          Name: senzing-data-version-dir
           EFSVolumeConfiguration:
               AuthorizationConfig: {}
               FilesystemId:
                 Ref: EfsFileSystem
-              RootDirectory: "/data/1.0.0"
+              RootDirectory: /data/1.0.0
         -
-          Name: "senzing-etc-dir"
+          Name: senzing-etc-dir
           EFSVolumeConfiguration:
               AuthorizationConfig: {}
               FilesystemId:
                 Ref: EfsFileSystem
-              RootDirectory: "/etc"
+              RootDirectory: /etc
         -
-          Name: "senzing-g2-dir"
+          Name: senzing-g2-dir
           EFSVolumeConfiguration:
               AuthorizationConfig: {}
               FilesystemId:
                 Ref: EfsFileSystem
-              RootDirectory: "/g2"
+              RootDirectory: /g2
         -
-          Name: "senzing-var-dir"
+          Name: senzing-var-dir
           EFSVolumeConfiguration:
               AuthorizationConfig: {}
               FilesystemId:
                 Ref: EfsFileSystem
-              RootDirectory: "/var"
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionRedoer:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_EXIT_ON_THREAD_TERMINATION
+              Value: true
+            -
+              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
+              Value: 600
+            -
+              Name: SENZING_GOVERNOR_DATABASE_URLS
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_LOG_LEVEL
+              Value: info
+            -
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: 600
+            -
+              Name: SENZING_REDO_SLEEP_TIME_IN_SECONDS
+              Value: 600
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: redo
+          Essential: true
+          Image: senzing/redoer:1.3.4
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: advanced
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: true
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: redoer
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 4096
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
+      Memory: 16384
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-redoer"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
 
 
   EcsTaskDefinitionSshd:
@@ -1024,7 +1130,7 @@ Resources:
         - "FARGATE"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-sshd"
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-sshd"
       Volumes:
         -
           Name: "senzing-data-version-dir"
@@ -1592,31 +1698,6 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
 
-  EcsServiceSshd:
-    DependsOn:
-     - LambdaRunnerInitEfs
-    Properties:
-      Cluster: !Ref EcsCluster
-      DesiredCount: 1
-      EnableECSManagedTags: true
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsSecurityGroup
-          Subnets:
-            - !Ref Ec2SubnetPublic1
-            - !Ref Ec2SubnetPublic2
-      PlatformVersion: 1.4.0
-      ServiceName: sshd
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-runner-init-senzing"
-      TaskDefinition: !Ref EcsTaskDefinitionSshd
-    Type: AWS::ECS::Service
-
-
   EcsServiceStreamLoader:
     DependsOn:
      - LambdaRunnerInitSenzing
@@ -1637,8 +1718,58 @@ Resources:
       ServiceName: stream-loader
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-runner-stream-loader"
+          Value: !Sub "${AWS::StackName}-ecs-service-stream-loader"
       TaskDefinition: !Ref EcsTaskDefinitionStreamLoader
+    Type: AWS::ECS::Service
+
+
+  EcsServiceRedoer:
+    DependsOn:
+     - LambdaRunnerInitSenzing
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: redoer
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-redoer"
+      TaskDefinition: !Ref EcsTaskDefinitionRedoer
+    Type: AWS::ECS::Service
+
+
+  EcsServiceSshd:
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: sshd
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-sshd"
+      TaskDefinition: !Ref EcsTaskDefinitionSshd
     Type: AWS::ECS::Service
 
 # -- AutoScaling --------------------------------------------------------------
@@ -1651,9 +1782,8 @@ Resources:
       MinCapacity: 1
       ResourceId: !Sub "service/${EcsCluster}/${EcsServiceStreamLoader.Name}"
       RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-#     RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
-      ScalableDimension: "ecs:service:DesiredCount"
-      ServiceNamespace: "ecs"
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
       SuspendedState:
         DynamicScalingInSuspended: false
         DynamicScalingOutSuspended: false
