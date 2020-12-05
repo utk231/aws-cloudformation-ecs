@@ -841,19 +841,6 @@ Resources:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: "advanced"
-          MountPoints:
-            -
-              SourceVolume: "senzing-data-version-dir"
-              ContainerPath: "/opt/senzing/data"
-              ReadOnly: false
-            -
-              SourceVolume: "senzing-etc-dir"
-              ContainerPath: "/etc/opt/senzing"
-              ReadOnly: false
-            -
-              SourceVolume: "senzing-g2-dir"
-              ContainerPath: "/opt/senzing/g2"
-              ReadOnly: false
           Name: "producer1"
           Privileged: false
           PseudoTerminal: false
@@ -868,28 +855,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-init-efs"
-      Volumes:
-        -
-          Name: "senzing-data-version-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/data/1.0.0"
-        -
-          Name: "senzing-etc-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/etc"
-        -
-          Name: "senzing-g2-dir"
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: "/g2"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+
 
 
   EcsTaskDefinitionSshd:
@@ -988,6 +955,7 @@ Resources:
         - Effect: Allow
           Principal:
             Service:
+              - ecs-tasks.amazonaws.com
               - lambda.amazonaws.com
               - sqs.amazonaws.com
           Action:
@@ -1006,6 +974,7 @@ Resources:
               - ec2:DescribeNetworkInterfaces
               - ecs:DescribeTasks
               - ecs:RunTask
+              - iam:PassRole
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
