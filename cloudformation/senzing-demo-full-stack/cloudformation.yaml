@@ -531,6 +531,11 @@ Resources:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
     Type: AWS::Logs::LogGroup
 
+# LogsLogGroup2:
+#   Type: "AWS::Logs::LogGroup"
+#   Properties:
+#     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-debug"
+
 # -- EcsTaskDefinition --------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
