@@ -68,7 +68,7 @@ Parameters:
 
   StartApiServer:
     Description: Would you like to run the Senzing API service?
-    Default: "No"
+    Default: "Yes"
     Type: String
     AllowedValues:
       - "No"
@@ -76,7 +76,7 @@ Parameters:
 
   StartSshd:
     Description: Would you like to run sshd service?
-    Default: "No"
+    Default: "Yes"
     Type: String
     AllowedValues:
       - "No"
@@ -1139,6 +1139,10 @@ Resources:
               ContainerPath: /var/opt/senzing
               ReadOnly: false
           Name: api-server
+          PortMappings:
+            - ContainerPort: 8250
+              HostPort: 8250
+              Protocol: tcp
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
@@ -1323,6 +1327,37 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
     Type: AWS::IAM::Role
+
+
+# IamRoleEcsService:
+#   Properties:
+#     AssumeRolePolicyDocument:
+#       Statement:
+#         -
+#           Action:
+#             - sts:AssumeRole
+#           Effect: Allow
+#           Principal:
+#             Service:
+#               - ecs.amazonaws.com
+#     Path: "/"
+#     Policies:
+#       -
+#         PolicyName: !Sub "${AWS::StackName}-iam-role-ecs-service"
+#         PolicyDocument:
+#           Statement:
+#             -
+#               Action:
+#                 - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+#                 - elasticloadbalancing:DeregisterTargets
+#                 - elasticloadbalancing:Describe*
+#                 - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+#                 - elasticloadbalancing:RegisterTargets
+#                 - ec2:Describe*
+#                 - ec2:AuthorizeSecurityGroupIngress
+#               Effect: Allow
+#               Resource: "*"
+#   Type: AWS::IAM::Role
 
 
 # -- LambdaFunction -----------------------------------------------------------
@@ -1802,6 +1837,69 @@ Resources:
       ServiceToken: !GetAtt LambdaFunctionRunTask.Arn
     Type: Custom::LambdaRunnerStreamProducer
 
+# -- Load balancing -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+
+  Listener:
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8250
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AWS::StackName}-load-balancer"
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref EcsSecurityGroup
+      Subnets:
+        - !Ref Ec2SubnetPublic1
+        - !Ref Ec2SubnetPublic2
+      Type: application
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
+
+  TargetGroup:
+    DependsOn: LoadBalancer
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      Port: 8250
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 80
+      HealthCheckPath: "/heartbeat"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 50
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '60'
+      TargetType: ip
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+
+# LoadBalancer:
+#   Properties:
+#     AvailabilityZones:
+#       - !GetAtt Ec2SubnetPublic1.AvailabilityZone
+#       - !GetAtt Ec2SubnetPublic2.AvailabilityZone
+#     Listeners:
+#       -
+#         LoadBalancerPort: '8250'
+#         InstancePort: '8250'
+#         Protocol: HTTP
+#     LoadBalancerName: !Sub "${AWS::StackName}-loadbalancer"
+#   Type: AWS::ElasticLoadBalancing::LoadBalancer
+
 # -- EcsService ---------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
@@ -1866,6 +1964,11 @@ Resources:
       DesiredCount: 1
       EnableECSManagedTags: true
       LaunchType: FARGATE
+      LoadBalancers:
+        -
+          ContainerPort: 8250
+          ContainerName: api-server
+          TargetGroupArn: !Ref TargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
