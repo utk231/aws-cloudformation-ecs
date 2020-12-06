@@ -40,6 +40,14 @@ Parameters:
     NoEcho: 'true'
     Type: String
 
+  StartSshd:
+    Description: Would you like to run sshd service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
   SecurityGroupIds:
     Default: ''
     Description: >-
@@ -113,6 +121,10 @@ Conditions:
   CreateVpcResources: !Equals
     - !Ref VpcId
     - ''
+
+  IfStartSshd: !Equals
+    - !Ref StartSshd
+    - "Yes"
 
   UseSpecifiedVpcAvailabilityZones: !Not
     - !Equals
@@ -1761,6 +1773,7 @@ Resources:
 
 
   EcsServiceSshd:
+    Condition: IfStartSshd
     DependsOn:
      - LambdaRunnerInitEfs
     Properties:
