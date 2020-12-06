@@ -191,7 +191,6 @@ Resources:
       VpcId: !Ref Ec2Vpc
     Type: AWS::EC2::Subnet
 
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
   EcsSecurityGroup:
@@ -442,7 +441,7 @@ Resources:
       MasterUserPassword: !Ref DbPassword
       ScalingConfiguration:
         AutoPause: true
-        MaxCapacity: 32
+        MaxCapacity: 192
         MinCapacity: 2
         SecondsUntilAutoPause: 3600
 #       https://github.com/aws-cloudformation/aws-cloudformation-coverage-roadmap/issues/298
@@ -565,7 +564,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: job
           MountPoints:
             -
               SourceVolume: senzing-efs-root
@@ -616,7 +615,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: job
           MountPoints:
             -
               SourceVolume: senzing-data-dir
@@ -683,7 +682,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: job
           MountPoints:
             -
               SourceVolume: senzing-g2-dir
@@ -737,7 +736,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: job
           MountPoints:
             -
               SourceVolume: senzing-data-version-dir
@@ -835,7 +834,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: job
           Name: producer1
           Privileged: false
           PseudoTerminal: false
@@ -913,7 +912,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: service
           MountPoints:
             -
               SourceVolume: senzing-data-version-dir
@@ -1019,7 +1018,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: service
           MountPoints:
             -
               SourceVolume: senzing-data-version-dir
@@ -1100,7 +1099,7 @@ Resources:
             Options:
               awslogs-group: !Sub "${AWS::StackName}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: advanced
+              awslogs-stream-prefix: service
           MountPoints:
             -
               SourceVolume: senzing-data-version-dir
@@ -1710,7 +1709,7 @@ Resources:
      - LambdaRunnerInitSenzing
     Properties:
       Cluster: !Ref EcsCluster
-      DesiredCount: 1
+      DesiredCount: 8
       EnableECSManagedTags: true
       LaunchType: FARGATE
       NetworkConfiguration:
@@ -1722,6 +1721,7 @@ Resources:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
       PlatformVersion: 1.4.0
+      PropagateTags: TASK_DEFINITION
       ServiceName: stream-loader
       Tags:
         - Key: Name
