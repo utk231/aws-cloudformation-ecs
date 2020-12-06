@@ -668,11 +668,11 @@ Resources:
         -
           Environment:
             -
-              Name: SENZING_SQL_FILE
-              Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
-            -
               Name: SENZING_DATABASE_URL
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_SQL_FILE
+              Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
           Image: senzing/postgresql-client:1.0.0
           LinuxParameters:
@@ -799,32 +799,32 @@ Resources:
         -
           Environment:
             -
-              Name: SENZING_READ_QUEUE_MAXSIZE
-              Value: 200
-            -
-              Name: SENZING_THREADS_PER_PRINT
-              Value: 30
-            -
-              Name: SENZING_RECORD_MAX
-              Value: !Sub "${SenzingRecordMax}"
-            -
               Name: SENZING_INPUT_URL
               Value: !Sub "${SenzingInputUrl}"
-            -
-              Name: SENZING_SQS_QUEUE_URL
-              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
-            -
-              Name: SENZING_RECORD_MONITOR
-              Value: 100000
             -
               Name: SENZING_MONITORING_PERIOD_IN_SECONDS
               Value: 60
             -
-              Name: SENZING_SUBCOMMAND
-              Value: gzipped-json-to-sqs-batch
+              Name: SENZING_READ_QUEUE_MAXSIZE
+              Value: 200
+            -
+              Name: SENZING_RECORD_MAX
+              Value: !Sub "${SenzingRecordMax}"
             -
               Name: SENZING_RECORD_MIN
               Value: !Sub "${SenzingRecordMin}"
+            -
+              Name: SENZING_RECORD_MONITOR
+              Value: 100000
+            -
+              Name: SENZING_SQS_QUEUE_URL
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: gzipped-json-to-sqs-batch
+            -
+              Name: SENZING_THREADS_PER_PRINT
+              Value: 30
           Essential: true
           Image: senzing/stream-producer:1.2.3
           LinuxParameters:
