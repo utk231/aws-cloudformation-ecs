@@ -40,14 +40,6 @@ Parameters:
     NoEcho: 'true'
     Type: String
 
-  StartSshd:
-    Description: Would you like to run sshd service?
-    Default: "No"
-    Type: String
-    AllowedValues:
-      - "No"
-      - "Yes"
-
   SecurityGroupIds:
     Default: ''
     Description: >-
@@ -73,6 +65,22 @@ Parameters:
     Default: 0
     Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
     Type: Number
+
+  StartApiServer:
+    Description: Would you like to run the Senzing API service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
+  StartSshd:
+    Description: Would you like to run sshd service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
 
   VpcAvailabilityZones:
     Default: ''
@@ -121,6 +129,10 @@ Conditions:
   CreateVpcResources: !Equals
     - !Ref VpcId
     - ''
+
+  IfStartApiServer: !Equals
+    - !Ref StartApiServer
+    - "Yes"
 
   IfStartSshd: !Equals
     - !Ref StartSshd
@@ -498,25 +510,6 @@ Resources:
       VisibilityTimeout: 300
     Type: AWS::SQS::Queue
 
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-policy.html
-
-# SqsQueuePolicy:
-#   Type: AWS::SQS::QueuePolicy
-#   Properties:
-#     PolicyDocument:
-#       Statement:
-#         -
-#           Action:
-#             - "SQS:SendMessage"
-#             - "SQS:ReceiveMessage"
-#           Effect: "Allow"
-#           Resource: !GetAtt SqsQueue.Arn
-#           Principal:
-#             AWS:
-#               - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-#     Queues:
-#       - !Ref SqsQueue
-
 # -- ECS Cluster --------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
@@ -530,10 +523,6 @@ Resources:
           Value: disabled
     Type: AWS::ECS::Cluster
 
-# -- Authentication -----------------------------------------------------------
-
-# TODO: Needed for stream-producer.
-
 # -- Logging ------------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
@@ -543,6 +532,7 @@ Resources:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
     Type: AWS::Logs::LogGroup
 
+# https://operatingops.org/2019/09/28/cloudwatch-logs-preventing-orphaned-log-groups/
 # LogsLogGroup2:
 #   Type: "AWS::Logs::LogGroup"
 #   Properties:
@@ -1067,6 +1057,101 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-task-definition-redoer"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionApiServer:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Command:
+            - -httpPort
+            - "8250"
+            - -bindAddr
+            - all
+            - -iniFile
+            - /etc/opt/senzing/G2Module.ini
+            - -allowedOrigins
+            - "*"
+            - -enableAdmin
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: senzing/senzing-api-server:2.3.0
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: true
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: api-server
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-api-server"
+      Memory: 8192
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-api-server"
       TaskRoleArn: !GetAtt IamRoleLambda.Arn
       Volumes:
         -
@@ -1769,6 +1854,32 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-service-redoer"
       TaskDefinition: !Ref EcsTaskDefinitionRedoer
+    Type: AWS::ECS::Service
+
+
+  EcsServiceApiServer:
+    Condition: IfStartApiServer
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: api-server
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-api-server"
+      TaskDefinition: !Ref EcsTaskDefinitionApiServer
     Type: AWS::ECS::Service
 
 
