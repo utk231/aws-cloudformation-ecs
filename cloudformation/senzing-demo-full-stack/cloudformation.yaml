@@ -66,14 +66,6 @@ Parameters:
     Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
     Type: Number
 
-  StartApiServer:
-    Description: Would you like to run the Senzing API service?
-    Default: "Yes"
-    Type: String
-    AllowedValues:
-      - "No"
-      - "Yes"
-
   StartSshd:
     Description: Would you like to run sshd service?
     Default: "No"
@@ -84,7 +76,7 @@ Parameters:
 
   StartSwagger:
     Description: Would you like to run Swagger service?
-    Default: "Yes"
+    Default: "No"
     Type: String
     AllowedValues:
       - "No"
@@ -145,10 +137,6 @@ Conditions:
   CreateVpcResources: !Equals
     - !Ref VpcId
     - ''
-
-  IfStartApiServer: !Equals
-    - !Ref StartApiServer
-    - "Yes"
 
   IfStartSshd: !Equals
     - !Ref StartSshd
@@ -213,7 +201,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-1"
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::EC2::Subnet
 
 
@@ -236,7 +227,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-subnet-2"
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::EC2::Subnet
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
@@ -341,7 +335,10 @@ Resources:
     Condition: CreateVpcResources
     Properties:
       InternetGatewayId: !Ref Ec2InternetGateway
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::EC2::VPCGatewayAttachment
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
@@ -352,7 +349,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ec2-route-table"
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::EC2::RouteTable
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
@@ -1937,7 +1937,10 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
       Port: 8250
       Protocol: HTTP
       Matcher:
@@ -1960,7 +1963,10 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
       Port: 8080
       Protocol: HTTP
       Matcher:
@@ -1983,7 +1989,10 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !Ref Ec2Vpc
+      VpcId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
       Port: 8251
       Protocol: HTTP
       Matcher:
@@ -2041,7 +2050,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
 
   EcsServiceApiServer:
-    Condition: IfStartApiServer
     DependsOn:
      - LambdaRunnerInitEfs
     Properties:
@@ -2249,15 +2257,27 @@ Resources:
 
 Outputs:
 
+  ApiServerHeartbeatUrl:
+    Description: Url for Swagger
+    Value: !Sub "http://${LoadBalancer.DNSName}:8250/heartbeat"
+
   Ec2Vpc:
     Description: The ID of the VPC
-    Value: !Ref Ec2Vpc
+    Value: !If
+      - CreateVpcResources
+      - !Ref Ec2Vpc
+      - !Ref VpcId
     Export:
       Name: !Sub "${AWS::StackName}-ec2-VpcId"
 
   Host:
     Description: Host name of public services
     Value: !GetAtt LoadBalancer.DNSName
+
+  SwaggerUrl:
+    Condition: IfStartSwagger
+    Description: Url for Swagger
+    Value: !Sub "http://${LoadBalancer.DNSName}:8080"
 
   Subnet1:
     Description: The ID of subnet 1
@@ -2270,3 +2290,9 @@ Outputs:
     Value: !Ref Ec2SubnetPublic2
     Export:
       Name: !Sub "${AWS::StackName}-Subnet2"
+
+  WebAppUrl:
+    Condition: IfStartWebApp
+    Description: Url for Senzing Web App
+    Value: !Sub "http://${LoadBalancer.DNSName}:8251"
+
