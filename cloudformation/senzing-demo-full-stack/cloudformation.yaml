@@ -76,6 +76,14 @@ Parameters:
 
   StartSshd:
     Description: Would you like to run sshd service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
+  StartWebApp:
+    Description: Would you like to run the Senzing WebApp service?
     Default: "Yes"
     Type: String
     AllowedValues:
@@ -136,6 +144,10 @@ Conditions:
 
   IfStartSshd: !Equals
     - !Ref StartSshd
+    - "Yes"
+
+  IfStartWebApp: !Equals
+    - !Ref StartWebApp
     - "Yes"
 
   UseSpecifiedVpcAvailabilityZones: !Not
@@ -1268,6 +1280,52 @@ Resources:
               RootDirectory: /var
     Type: AWS::ECS::TaskDefinition
 
+
+  EcsTaskDefinitionWebApp:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_API_SERVER_URL
+              Value: !Sub "http://${LoadBalancer.DNSName}:8250"
+            -
+              Name: SENZING_WEB_SERVER_PORT
+              Value: 8251
+          Essential: true
+          Image: senzing/entity-search-web-app:2.1.1
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          Name: webapp
+          PortMappings:
+            - ContainerPort: 8251
+              HostPort: 8251
+              Protocol: tcp
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-webapp"
+      Memory: 8192
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-webapp"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+    Type: AWS::ECS::TaskDefinition
+
 # -- Iam -----------------------------------------------------------------
 
 #  IamAccessKeyLambda:
@@ -1327,38 +1385,6 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
     Type: AWS::IAM::Role
-
-
-# IamRoleEcsService:
-#   Properties:
-#     AssumeRolePolicyDocument:
-#       Statement:
-#         -
-#           Action:
-#             - sts:AssumeRole
-#           Effect: Allow
-#           Principal:
-#             Service:
-#               - ecs.amazonaws.com
-#     Path: "/"
-#     Policies:
-#       -
-#         PolicyName: !Sub "${AWS::StackName}-iam-role-ecs-service"
-#         PolicyDocument:
-#           Statement:
-#             -
-#               Action:
-#                 - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
-#                 - elasticloadbalancing:DeregisterTargets
-#                 - elasticloadbalancing:Describe*
-#                 - elasticloadbalancing:RegisterInstancesWithLoadBalancer
-#                 - elasticloadbalancing:RegisterTargets
-#                 - ec2:Describe*
-#                 - ec2:AuthorizeSecurityGroupIngress
-#               Effect: Allow
-#               Resource: "*"
-#   Type: AWS::IAM::Role
-
 
 # -- LambdaFunction -----------------------------------------------------------
 
@@ -1839,18 +1865,6 @@ Resources:
 
 # -- Load balancing -----------------------------------------------------------
 
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
-
-  Listener:
-    Properties:
-      DefaultActions:
-        - TargetGroupArn: !Ref TargetGroup
-          Type: forward
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 8250
-      Protocol: HTTP
-    Type: AWS::ElasticLoadBalancingV2::Listener
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
 
   LoadBalancer:
@@ -1867,8 +1881,9 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
 
-  TargetGroup:
-    DependsOn: LoadBalancer
+  TargetGroupApiServer:
+    DependsOn:
+     - LoadBalancer
     Properties:
       VpcId: !Ref Ec2Vpc
       Port: 8250
@@ -1887,22 +1902,88 @@ Resources:
       TargetType: ip
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
 
-# LoadBalancer:
-#   Properties:
-#     AvailabilityZones:
-#       - !GetAtt Ec2SubnetPublic1.AvailabilityZone
-#       - !GetAtt Ec2SubnetPublic2.AvailabilityZone
-#     Listeners:
-#       -
-#         LoadBalancerPort: '8250'
-#         InstancePort: '8250'
-#         Protocol: HTTP
-#     LoadBalancerName: !Sub "${AWS::StackName}-loadbalancer"
-#   Type: AWS::ElasticLoadBalancing::LoadBalancer
+
+  TargetGroupWebApp:
+    Condition: IfStartWebApp
+    DependsOn:
+     - LoadBalancer
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      Port: 8251
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 80
+      HealthCheckPath: "/"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 50
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '60'
+      TargetType: ip
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+
+  ListenerApiServer:
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupApiServer
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8250
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+
+  ListenerWebApp:
+    Condition: IfStartWebApp
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupWebApp
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8251
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
 
 # -- EcsService ---------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
+
+  EcsServiceApiServer:
+    Condition: IfStartApiServer
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        -
+          ContainerPort: 8250
+          ContainerName: api-server
+          TargetGroupArn: !Ref TargetGroupApiServer
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: api-server
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-api-server"
+      TaskDefinition: !Ref EcsTaskDefinitionApiServer
+    Type: AWS::ECS::Service
+
 
   EcsServiceStreamLoader:
     DependsOn:
@@ -1955,37 +2036,6 @@ Resources:
     Type: AWS::ECS::Service
 
 
-  EcsServiceApiServer:
-    Condition: IfStartApiServer
-    DependsOn:
-     - LambdaRunnerInitEfs
-    Properties:
-      Cluster: !Ref EcsCluster
-      DesiredCount: 1
-      EnableECSManagedTags: true
-      LaunchType: FARGATE
-      LoadBalancers:
-        -
-          ContainerPort: 8250
-          ContainerName: api-server
-          TargetGroupArn: !Ref TargetGroup
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsSecurityGroup
-          Subnets:
-            - !Ref Ec2SubnetPublic1
-            - !Ref Ec2SubnetPublic2
-      PlatformVersion: 1.4.0
-      ServiceName: api-server
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-service-api-server"
-      TaskDefinition: !Ref EcsTaskDefinitionApiServer
-    Type: AWS::ECS::Service
-
-
   EcsServiceSshd:
     Condition: IfStartSshd
     DependsOn:
@@ -2009,6 +2059,37 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-service-sshd"
       TaskDefinition: !Ref EcsTaskDefinitionSshd
+    Type: AWS::ECS::Service
+
+
+  EcsServiceWebApp:
+    Condition: IfStartWebApp
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        -
+          ContainerPort: 8251
+          ContainerName: webapp
+          TargetGroupArn: !Ref TargetGroupWebApp
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: webapp
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-webapp"
+      TaskDefinition: !Ref EcsTaskDefinitionWebApp
     Type: AWS::ECS::Service
 
 # -- AutoScaling --------------------------------------------------------------
@@ -2057,13 +2138,15 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-ec2-VpcId"
 
+  Host:
+    Description: Host name of public services
+    Value: !GetAtt LoadBalancer.DNSName
 
   Subnet1:
     Description: The ID of subnet 1
     Value: !Ref Ec2SubnetPublic1
     Export:
       Name: !Sub "${AWS::StackName}-Subnet1"
-
 
   Subnet2:
     Description: The ID of subnet 2
