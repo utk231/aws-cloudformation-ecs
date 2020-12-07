@@ -82,9 +82,17 @@ Parameters:
       - "No"
       - "Yes"
 
+  StartSwagger:
+    Description: Would you like to run Swagger service?
+    Default: "Yes"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
   StartWebApp:
     Description: Would you like to run the Senzing WebApp service?
-    Default: "Yes"
+    Default: "No"
     Type: String
     AllowedValues:
       - "No"
@@ -144,6 +152,10 @@ Conditions:
 
   IfStartSshd: !Equals
     - !Ref StartSshd
+    - "Yes"
+
+  IfStartSwagger: !Equals
+    - !Ref StartSwagger
     - "Yes"
 
   IfStartWebApp: !Equals
@@ -1281,6 +1293,46 @@ Resources:
     Type: AWS::ECS::TaskDefinition
 
 
+  EcsTaskDefinitionSwagger:
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: URL
+              Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
+          Essential: true
+          Image: swaggerapi/swagger-ui:latest
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          Name: swagger
+          PortMappings:
+            - ContainerPort: 8080
+              HostPort: 8080
+              Protocol: tcp
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: 1024
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      Family: !Sub "${AWS::StackName}-task-definition-swagger"
+      Memory: 8192
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-swagger"
+      TaskRoleArn: !GetAtt IamRoleLambda.Arn
+    Type: AWS::ECS::TaskDefinition
+
+
   EcsTaskDefinitionWebApp:
     DependsOn:
       - EfsMountTarget1
@@ -1903,6 +1955,29 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
 
 
+  TargetGroupSwagger:
+    Condition: IfStartSwagger
+    DependsOn:
+     - LoadBalancer
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      Port: 8080
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 80
+      HealthCheckPath: "/"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 50
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '60'
+      TargetType: ip
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+
+
   TargetGroupWebApp:
     Condition: IfStartWebApp
     DependsOn:
@@ -1938,6 +2013,18 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
 
 
+  ListenerSwagger:
+    Condition: IfStartSwagger
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8080
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+
   ListenerWebApp:
     Condition: IfStartWebApp
     Properties:
@@ -1948,7 +2035,6 @@ Resources:
       Port: 8251
       Protocol: HTTP
     Type: AWS::ElasticLoadBalancingV2::Listener
-
 
 # -- EcsService ---------------------------------------------------------------
 
@@ -2059,6 +2145,37 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-service-sshd"
       TaskDefinition: !Ref EcsTaskDefinitionSshd
+    Type: AWS::ECS::Service
+
+
+  EcsServiceSwagger:
+    Condition: IfStartSwagger
+    DependsOn:
+     - LambdaRunnerInitEfs
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        -
+          ContainerPort: 8080
+          ContainerName: swagger
+          TargetGroupArn: !Ref TargetGroupSwagger
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      ServiceName: swagger
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-swagger"
+      TaskDefinition: !Ref EcsTaskDefinitionSwagger
     Type: AWS::ECS::Service
 
 
