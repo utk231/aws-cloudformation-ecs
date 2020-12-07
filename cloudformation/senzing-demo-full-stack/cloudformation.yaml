@@ -53,7 +53,7 @@ Parameters:
     Type: String
 
   SenzingLicenseAsBase64:
-    Description: "Optional: Senzing license as base64 encoded string."
+    Description: "Optional: Senzing license as base64 encoded string. Needed to insert more than 100,000 records."
     Type: String
 
   SenzingRecordMax:
