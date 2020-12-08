@@ -49,7 +49,12 @@ Metadata:
           - RunWebApp
 
     ParameterLabels:
-      VPCID:
+      AcceptEula:
+        default: >-
+          Required: If you accept the Senzing End User License Agreements at
+          https://senzing.com/end-user-license-agreement,
+          enter 'I_ACCEPT_THE_SENZING_EULA'.
+      VpcId:
         default: "Which VPC should this be deployed to?"
 
 # -----------------------------------------------------------------------------
@@ -63,19 +68,7 @@ Parameters:
     AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
     ConstraintDescription: >-
       AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
-    Description: >-
-      Required: If you accept the Senzing End User License Agreements at
-      https://senzing.com/end-user-license-agreement,
-      enter 'I_ACCEPT_THE_SENZING_EULA'.
-    Type: String
-
-  DbUsername:
-    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
-    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
-    Default: senzing
-    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
-    MaxLength: 16
-    MinLength: 1
+    Description: "Help: https://github.com/Senzing/knowledge-base/blob/master/help/cloudformation-senzing-demo-full-stack.md#accepteula"
     Type: String
 
   DbPassword:
@@ -85,6 +78,15 @@ Parameters:
     MaxLength: '41'
     MinLength: '8'
     NoEcho: 'true'
+    Type: String
+
+  DbUsername:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+    Default: senzing
+    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: 16
+    MinLength: 1
     Type: String
 
   RunSshd:
