@@ -6,6 +6,58 @@ Description: >-
   Senzing formation for AWS FARGATE...
 
 # -----------------------------------------------------------------------------
+# Metadata
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/metadata-section-structure.html
+# -----------------------------------------------------------------------------
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Senzing ..."
+        Parameters:
+          - AcceptEula
+          - SenzingLicenseAsBase64
+      -
+        Label:
+          default: "Optional:  Identify existing resources"
+        Parameters:
+          - VpcId
+          - VpcAvailabilityZones
+          - SecurityGroupIds
+      -
+        Label:
+          default: "Database"
+        Parameters:
+          - DbUsername
+          - DbPassword
+      -
+        Label:
+          default: "Stream-producer"
+        Parameters:
+          - RunStreamProducer
+          - SenzingInputUrl
+          - SenzingRecordMin
+          - SenzingRecordMax
+      -
+        Label:
+          default: "Additional services"
+        Parameters:
+          - RunSshd
+          - RunSwagger
+          - RunWebApp
+
+    ParameterLabels:
+      AcceptEula:
+        default: >-
+          Required: If you accept the Senzing End User License Agreements at
+          https://senzing.com/end-user-license-agreement,
+          enter 'I_ACCEPT_THE_SENZING_EULA'.
+      VpcId:
+        default: "Which VPC should this be deployed to?"
+
+# -----------------------------------------------------------------------------
 # Parameters
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
 # -----------------------------------------------------------------------------
@@ -16,10 +68,16 @@ Parameters:
     AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
     ConstraintDescription: >-
       AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
-    Description: >-
-      Required: If you accept the Senzing End User License Agreements at
-      https://senzing.com/end-user-license-agreement,
-      enter 'I_ACCEPT_THE_SENZING_EULA'.
+    Description: "Help: https://github.com/Senzing/knowledge-base/blob/master/help/cloudformation-senzing-demo-full-stack.md#accepteula"
+    Type: String
+
+  DbPassword:
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: Must contain only alphanumeric characters.
+    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
     Type: String
 
   DbUsername:
@@ -31,14 +89,37 @@ Parameters:
     MinLength: 1
     Type: String
 
-  DbPassword:
-    AllowedPattern: '[a-zA-Z0-9]*'
-    ConstraintDescription: Must contain only alphanumeric characters.
-    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
-    MaxLength: '41'
-    MinLength: '8'
-    NoEcho: 'true'
+  RunSshd:
+    Description: Would you like to run sshd service?
+    Default: "No"
     Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
+  RunStreamProducer:
+    Description: Would you like to run stream-producer job?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
+  RunSwagger:
+    Description: Would you like to run Swagger service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
+
+  RunWebApp:
+    Description: Would you like to run the Senzing WebApp service?
+    Default: "No"
+    Type: String
+    AllowedValues:
+      - "No"
+      - "Yes"
 
   SecurityGroupIds:
     Default: ''
@@ -65,30 +146,6 @@ Parameters:
     Default: 0
     Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
     Type: Number
-
-  StartSshd:
-    Description: Would you like to run sshd service?
-    Default: "No"
-    Type: String
-    AllowedValues:
-      - "No"
-      - "Yes"
-
-  StartSwagger:
-    Description: Would you like to run Swagger service?
-    Default: "No"
-    Type: String
-    AllowedValues:
-      - "No"
-      - "Yes"
-
-  StartWebApp:
-    Description: Would you like to run the Senzing WebApp service?
-    Default: "No"
-    Type: String
-    AllowedValues:
-      - "No"
-      - "Yes"
 
   VpcAvailabilityZones:
     Default: ''
@@ -138,16 +195,20 @@ Conditions:
     - !Ref VpcId
     - ''
 
-  IfStartSshd: !Equals
-    - !Ref StartSshd
+  IfRunSshd: !Equals
+    - !Ref RunSshd
     - "Yes"
 
-  IfStartSwagger: !Equals
-    - !Ref StartSwagger
+  IfRunStreamProducer: !Equals
+    - !Ref RunStreamProducer
     - "Yes"
 
-  IfStartWebApp: !Equals
-    - !Ref StartWebApp
+  IfRunSwagger: !Equals
+    - !Ref RunSwagger
+    - "Yes"
+
+  IfRunWebApp: !Equals
+    - !Ref RunWebApp
     - "Yes"
 
   UseSpecifiedVpcAvailabilityZones: !Not
@@ -1959,7 +2020,7 @@ Resources:
 
 
   TargetGroupSwagger:
-    Condition: IfStartSwagger
+    Condition: IfRunSwagger
     DependsOn:
      - LoadBalancer
     Properties:
@@ -1985,7 +2046,7 @@ Resources:
 
 
   TargetGroupWebApp:
-    Condition: IfStartWebApp
+    Condition: IfRunWebApp
     DependsOn:
      - LoadBalancer
     Properties:
@@ -2023,7 +2084,7 @@ Resources:
 
 
   ListenerSwagger:
-    Condition: IfStartSwagger
+    Condition: IfRunSwagger
     Properties:
       DefaultActions:
         - TargetGroupArn: !Ref TargetGroupSwagger
@@ -2035,7 +2096,7 @@ Resources:
 
 
   ListenerWebApp:
-    Condition: IfStartWebApp
+    Condition: IfRunWebApp
     Properties:
       DefaultActions:
         - TargetGroupArn: !Ref TargetGroupWebApp
@@ -2131,7 +2192,7 @@ Resources:
 
 
   EcsServiceSshd:
-    Condition: IfStartSshd
+    Condition: IfRunSshd
     DependsOn:
      - LambdaRunnerInitEfs
     Properties:
@@ -2157,7 +2218,7 @@ Resources:
 
 
   EcsServiceSwagger:
-    Condition: IfStartSwagger
+    Condition: IfRunSwagger
     DependsOn:
      - LambdaRunnerInitEfs
     Properties:
@@ -2188,7 +2249,7 @@ Resources:
 
 
   EcsServiceWebApp:
-    Condition: IfStartWebApp
+    Condition: IfRunWebApp
     DependsOn:
      - LambdaRunnerInitEfs
     Properties:
@@ -2275,7 +2336,7 @@ Outputs:
     Value: !GetAtt LoadBalancer.DNSName
 
   SwaggerUrl:
-    Condition: IfStartSwagger
+    Condition: IfRunSwagger
     Description: Url for Swagger
     Value: !Sub "http://${LoadBalancer.DNSName}:8080"
 
@@ -2292,7 +2353,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-Subnet2"
 
   WebAppUrl:
-    Condition: IfStartWebApp
+    Condition: IfRunWebApp
     Description: Url for Senzing Web App
     Value: !Sub "http://${LoadBalancer.DNSName}:8251"
 
