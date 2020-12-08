@@ -15,17 +15,10 @@ Metadata:
     ParameterGroups:
       -
         Label:
-          default: "Senzing ..."
+          default: "Senzing installation"
         Parameters:
           - AcceptEula
           - SenzingLicenseAsBase64
-      -
-        Label:
-          default: "Optional:  Identify existing resources"
-        Parameters:
-          - VpcId
-          - VpcAvailabilityZones
-          - SecurityGroupIds
       -
         Label:
           default: "Database"
@@ -34,7 +27,14 @@ Metadata:
           - DbPassword
       -
         Label:
-          default: "Stream-producer"
+          default: "Optional: Identify existing resources"
+        Parameters:
+          - VpcId
+          - VpcAvailabilityZones
+          - SecurityGroupIds
+      -
+        Label:
+          default: "Optional: Stream-producer"
         Parameters:
           - RunStreamProducer
           - SenzingInputUrl
@@ -42,7 +42,7 @@ Metadata:
           - SenzingRecordMax
       -
         Label:
-          default: "Additional services"
+          default: "Optional: Additional services"
         Parameters:
           - RunSshd
           - RunSwagger
@@ -54,8 +54,49 @@ Metadata:
           Required: If you accept the Senzing End User License Agreements at
           https://senzing.com/end-user-license-agreement,
           enter 'I_ACCEPT_THE_SENZING_EULA'.
+      DbPassword:
+        default: "Required: Password for AWS Aurora PostgreSQL serverless database access."
+      DbUsername:
+        default: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+      RunSshd:
+        default: "Optional: Would you like to run sshd service?"
+      RunStreamProducer:
+        default: "Optional: Would you like to run stream-producer job?"
+      RunSwagger:
+        default: "Optional: Would you like to run Swagger service?"
+      RunWebApp:
+        default: "Optional: Would you like to run the Senzing WebApp service?"
+      SecurityGroupIds:
+        default: >-
+          Optional:
+          Existing security group to associate the container instances.
+          Creates one by default.
+      SenzingInputUrl:
+        default: >-
+          Required if running stream-producer job.
+          URL to file of JSON records to be sent to AWS SQS queue.
+      SenzingLicenseAsBase64:
+        default: >-
+          Required if inserting more than 100K records.
+          Senzing license as base64 encoded string.
+      SenzingRecordMax:
+        default: >-
+          Required if running stream-producer job.
+          Last record to read from file of JSON records.
+          '0' means read to end of file.
+      SenzingRecordMin:
+        default: >-
+          Required if running stream-producer job.
+          First record to read from file of JSON records.
+          '0' means start from the beginning.
+      VpcAvailabilityZones:
+        default: >-
+          Required if specifying existing VPC.
+          Comma-delimited list of VPC availability zones in which to create subnets.
       VpcId:
-        default: "Which VPC should this be deployed to?"
+        default: >-
+          Optional: VPC Id of existing VPC.
+          Leave blank to have a new VPC created.
 
 # -----------------------------------------------------------------------------
 # Parameters
@@ -68,13 +109,13 @@ Parameters:
     AllowedPattern: '^I_ACCEPT_THE_SENZING_EULA$'
     ConstraintDescription: >-
       AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
-    Description: "Help: https://github.com/Senzing/knowledge-base/blob/master/help/cloudformation-senzing-demo-full-stack.md#accepteula"
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#accepteula"
     Type: String
 
   DbPassword:
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: Must contain only alphanumeric characters.
-    Description: "Required: Password for AWS Aurora PostgreSQL serverless database access."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#dbpassword"
     MaxLength: '41'
     MinLength: '8'
     NoEcho: 'true'
@@ -84,13 +125,13 @@ Parameters:
     AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
     Default: senzing
-    Description: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#dbusername"
     MaxLength: 16
     MinLength: 1
     Type: String
 
   RunSshd:
-    Description: Would you like to run sshd service?
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Default: "No"
     Type: String
     AllowedValues:
@@ -98,7 +139,7 @@ Parameters:
       - "Yes"
 
   RunStreamProducer:
-    Description: Would you like to run stream-producer job?
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
     Default: "No"
     Type: String
     AllowedValues:
@@ -106,7 +147,7 @@ Parameters:
       - "Yes"
 
   RunSwagger:
-    Description: Would you like to run Swagger service?
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Default: "No"
     Type: String
     AllowedValues:
@@ -114,8 +155,8 @@ Parameters:
       - "Yes"
 
   RunWebApp:
-    Description: Would you like to run the Senzing WebApp service?
-    Default: "No"
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
+    Default: "Yes"
     Type: String
     AllowedValues:
       - "No"
@@ -123,35 +164,31 @@ Parameters:
 
   SecurityGroupIds:
     Default: ''
-    Description: >-
-      Optional: Existing security group to associate the container instances.
-      Creates one by default.
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#securitygroupids"
     Type: CommaDelimitedList
 
   SenzingInputUrl:
     Default: https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz
-    Description: "Required: URL to file of JSON records to be sent to AWS SQS queue."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinginputurl"
     Type: String
 
   SenzingLicenseAsBase64:
-    Description: "Optional: Senzing license as base64 encoded string. Needed to insert more than 100,000 records."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinglicenseasbase64"
     Type: String
 
   SenzingRecordMax:
     Default: 100000
-    Description: "Required: Last record to read from SenzingInputUrl. '0' means read to end of file."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmax"
     Type: Number
 
   SenzingRecordMin:
     Default: 0
-    Description: "Required: First record to read from SenzingInputUrl.  '0' means start from the beginning."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmin"
     Type: Number
 
   VpcAvailabilityZones:
     Default: ''
-    Description: >-
-      Optional: Comma-delimited list of VPC availability zones in which to
-      create subnets.  Required if setting VpcId.
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcavailabilityzones"
     Type: CommaDelimitedList
 
   VpcId:
@@ -160,7 +197,7 @@ Parameters:
       VPC Id must begin with 'vpc-' followed by either an 8 or 17 character
       identifier, or leave blank to have a new VPC created
     Default: ''
-    Description: "Optional: VPC Id of existing VPC. Leave blank to have a new VPC created."
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcid"
     Type: String
 
 # -----------------------------------------------------------------------------
