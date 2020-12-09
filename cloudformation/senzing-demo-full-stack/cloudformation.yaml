@@ -1,7 +1,9 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 # File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
-# Lint: https://github.com/aws-cloudformation/cfn-python-lint
+# Tests:
+#     Lint: https://github.com/aws-cloudformation/cfn-python-lint
+#     Nag: https://github.com/stelligent/cfn_nag
 
 Description: >-
   Senzing formation for AWS FARGATE...
@@ -26,6 +28,11 @@ Metadata:
         Parameters:
           - DbUsername
           - DbPassword
+      -
+        Label:
+          default: "Logging"
+        Parameters:
+          - LogRetentionInDays
       -
         Label:
           default: "Optional: Identify existing resources"
@@ -58,6 +65,8 @@ Metadata:
         default: "Required: Password for AWS Aurora PostgreSQL serverless database access."
       DbUsername:
         default: "Required: Username for AWS Aurora PostgreSQL serverless database access."
+      LogRetentionInDays:
+        default: "Required: The number of days to retain the log events in the log groups."
       RunSshd:
         default: "Optional: Would you like to run sshd service?"
       RunStreamProducer:
@@ -111,9 +120,9 @@ Parameters:
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: Must contain only alphanumeric characters.
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#dbpassword"
-    MaxLength: '41'
-    MinLength: '8'
-    NoEcho: 'true'
+    MaxLength: 41
+    MinLength: 8
+    NoEcho: true
     Type: String
 
   DbUsername:
@@ -125,37 +134,60 @@ Parameters:
     MinLength: 1
     Type: String
 
-  RunSshd:
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
-    Default: "No"
-    Type: String
+  LogRetentionInDays:
     AllowedValues:
-      - "No"
-      - "Yes"
+      -   1
+      -   3
+      -   5
+      -   7
+      -  14
+      -  30
+      -  60
+      -  90
+      - 120
+      - 150
+      - 180
+      - 365
+      - 400
+      - 545
+      - 731
+      - 1827
+      - 3653
+    Default: 14
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#logretention"
+    Type: Number
+
+  RunSshd:
+    AllowedValues:
+      - No
+      - Yes
+    Default: Yes
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
+    Type: String
 
   RunStreamProducer:
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
-    Default: "No"
-    Type: String
     AllowedValues:
-      - "No"
-      - "Yes"
+      - No
+      - Yes
+    Default: Yes
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
+    Type: String
 
   RunSwagger:
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
-    Default: "No"
-    Type: String
     AllowedValues:
-      - "No"
-      - "Yes"
+      - No
+      - Yes
+    Default: Yes
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
+    Type: String
 
   RunWebApp:
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
-    Default: "Yes"
-    Type: String
     AllowedValues:
-      - "No"
-      - "Yes"
+      - No
+      - Yes
+    Default: Yes
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
+    Type: String
 
   SenzingInputUrl:
     Default: https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz
@@ -318,9 +350,11 @@ Resources:
   EcsSecurityGroup:
     Properties:
       GroupDescription: ECS Allowed Ports
+#     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
       SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
+          Description: All
           IpProtocol: "-1"
       SecurityGroupIngress:
         -
@@ -463,7 +497,7 @@ Resources:
 
   EfsFileSystem:
     Properties:
-      Encrypted: false
+      Encrypted: true
       FileSystemTags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-efs-filesystem"
@@ -577,6 +611,7 @@ Resources:
   SqsQueueDeadLetter:
     Properties:
       DelaySeconds: 0
+      KmsMasterKeyId: alias/aws/sqs
       MaximumMessageSize: 262144
       MessageRetentionPeriod: 1209600
       QueueName: !Sub "${AWS::StackName}-sqs-dead-letter-queue"
@@ -588,6 +623,7 @@ Resources:
   SqsQueue:
     Properties:
       DelaySeconds: 0
+      KmsMasterKeyId: alias/aws/sqs
       MaximumMessageSize: 262144
       MessageRetentionPeriod: 1209600
       QueueName: !Sub "${AWS::StackName}-sqs-queue"
@@ -621,6 +657,7 @@ Resources:
   LogsLogGroup:
     Properties:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
+      RetentionInDays:  !Sub ${LogRetentionInDays}
     Type: AWS::Logs::LogGroup
 
 # https://operatingops.org/2019/09/28/cloudwatch-logs-preventing-orphaned-log-groups/
@@ -1488,9 +1525,24 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:SendMessage
                   - sqs:DeleteMessage
-                  - sqs:*
                 Effect: Allow
-                Resource: '*'
+                Resource:
+                  - "*"
+#                 - !GetAtt SqsQueue.Arn
+#                 - !GetAtt SqsQueueDeadLetter.Arn
+#                 - !GetAtt LambdaRunnerInitEfs.Arn
+#                 - !GetAtt LambdaRunnerStreamProducer.Arn
+
+
+#                 - !GetAtt EcsTaskDefinitionStreamLoader.Arn
+#                 - !GetAtt EcsTaskDefinitionRedoer.Arn
+#                 - !GetAtt EcsTaskDefinitionApiServer.Arn
+#                 - !GetAtt EcsTaskDefinitionSwagger.Arn
+#                 - !GetAtt EcsTaskDefinitionWebApp.Arn
+#                 - !GetAtt LambdaFunctionDebug.Arn
+#                 - !GetAtt LambdaFunctionSleeper.Arn
+#                 - !GetAtt LambdaFunctionRunTask.Arn
+#                 - !GetAtt LambdaFunctionRunTaskAndWait.Arn
               -
                 Action:
                   - iam:PassRole
@@ -1499,7 +1551,7 @@ Resources:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
             Version: '2012-10-17'
           PolicyName: LambdaFunctionPolicy
-      RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
+#     RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
@@ -1990,7 +2042,17 @@ Resources:
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "${AWS::StackName}-load-balancer"
+#     LoadBalancerAttributes:
+#       -
+#         Key: access_logs.s3.enabled
+#         Value: true
+#       -
+#         Key: access_logs.s3.bucket
+#         Value: "xxxxxxx"
+#       -
+#         Key: access_logs.s3.prefix
+#         Value: "senzing-fsd"
+#     Name: !Sub "${AWS::StackName}-load-balancer"
       Scheme: internet-facing
       SecurityGroups:
         - !Ref EcsSecurityGroup
@@ -2329,6 +2391,14 @@ Outputs:
     Description: Url for Swagger
     Value: !Sub "http://${LoadBalancer.DNSName}:8250/heartbeat"
 
+  DatabaseHost:
+    Description: The connection endpoint for the DB cluster.
+    Value:  !GetAtt RdsDbCluster.Endpoint.Address
+
+  DatabasePort:
+    Description: The port number that will accept connections on this DB cluster.
+    Value:  !GetAtt RdsDbCluster.Endpoint.Port
+
   Ec2Vpc:
     Description: The ID of the VPC
     Value: !If
@@ -2341,6 +2411,14 @@ Outputs:
   Host:
     Description: Host name of public services
     Value: !GetAtt LoadBalancer.DNSName
+
+  Queue:
+    Description: URL of the input queue
+    Value: !Ref SqsQueue
+
+  QueueDeadLetter:
+    Description: URL of the dead-letter queue
+    Value: !Ref SqsQueueDeadLetter
 
   SwaggerUrl:
     Condition: IfRunSwagger
