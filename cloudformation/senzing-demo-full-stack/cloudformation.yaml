@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 # File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+# Lint: https://github.com/aws-cloudformation/cfn-python-lint
 
 Description: >-
   Senzing formation for AWS FARGATE...
@@ -31,7 +32,6 @@ Metadata:
         Parameters:
           - VpcId
           - VpcAvailabilityZones
-          - SecurityGroupIds
       -
         Label:
           default: "Optional: Stream-producer"
@@ -66,11 +66,6 @@ Metadata:
         default: "Optional: Would you like to run Swagger service?"
       RunWebApp:
         default: "Optional: Would you like to run the Senzing WebApp service?"
-      SecurityGroupIds:
-        default: >-
-          Optional:
-          Existing security group to associate the container instances.
-          Creates one by default.
       SenzingInputUrl:
         default: >-
           Required if running stream-producer job.
@@ -162,11 +157,6 @@ Parameters:
       - "No"
       - "Yes"
 
-  SecurityGroupIds:
-    Default: ''
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#securitygroupids"
-    Type: CommaDelimitedList
-
   SenzingInputUrl:
     Default: https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinginputurl"
@@ -222,12 +212,6 @@ Mappings:
 
 Conditions:
 
-  CreateSecurityGroup: !Equals
-    - !Join
-      - ''
-      - !Ref SecurityGroupIds
-    - ''
-
   CreateVpcResources: !Equals
     - !Ref VpcId
     - ''
@@ -281,7 +265,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
 
   Ec2SubnetPublic1:
-    Condition: CreateVpcResources
     Properties:
       AvailabilityZone: !If
         - UseSpecifiedVpcAvailabilityZones
@@ -307,7 +290,6 @@ Resources:
 
 
   Ec2SubnetPublic2:
-    Condition: CreateVpcResources
     Properties:
       AvailabilityZone: !If
         - UseSpecifiedVpcAvailabilityZones
@@ -334,13 +316,12 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
   EcsSecurityGroup:
-    Condition: CreateSecurityGroup
     Properties:
       GroupDescription: ECS Allowed Ports
       SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
-          IpProtocol: -1
+          IpProtocol: "-1"
       SecurityGroupIngress:
         -
           CidrIp: 0.0.0.0/0
@@ -420,7 +401,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
   Ec2InternetGateway:
-    Condition: CreateVpcResources
     Properties:
       Tags:
         - Key: Name
@@ -430,7 +410,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
 
   Ec2VpcGatewayAttachment:
-    Condition: CreateVpcResources
     Properties:
       InternetGatewayId: !Ref Ec2InternetGateway
       VpcId: !If
@@ -442,7 +421,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
 
   Ec2RouteTable:
-    Condition: CreateVpcResources
     Properties:
       Tags:
         - Key: Name
@@ -456,7 +434,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
 
   Ec2Route:
-    Condition: CreateVpcResources
     DependsOn:
      - Ec2VpcGatewayAttachment
     Properties:
@@ -468,7 +445,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
 
   Ec2SubnetRouteTableAssociation1:
-    Condition: CreateVpcResources
     Properties:
       RouteTableId: !Ref Ec2RouteTable
       SubnetId: !Ref Ec2SubnetPublic1
@@ -476,7 +452,6 @@ Resources:
 
 
   Ec2SubnetRouteTableAssociation2:
-    Condition: CreateVpcResources
     Properties:
       RouteTableId: !Ref Ec2RouteTable
       SubnetId: !Ref Ec2SubnetPublic2
@@ -534,9 +509,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbsubnet-group.html
 
   RdsDbSubnetGroup:
-    DependsOn:
-      - Ec2SubnetPublic1
-      - Ec2SubnetPublic2
     Properties:
       DBSubnetGroupDescription: !Sub "${AWS::StackName}-db-subnet-description"
       DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet"
@@ -564,9 +536,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
 
   RdsDbCluster:
-    DependsOn:
-      - RdsDbSubnetGroup
-      - RdsDbClusterParameterGroup
     Properties:
       AvailabilityZones:
         - !GetAtt Ec2SubnetPublic1.AvailabilityZone
@@ -582,7 +551,7 @@ Resources:
       EnableIAMDatabaseAuthentication: false
       Engine: aurora-postgresql
       EngineMode: serverless
-      EngineVersion: 10.7
+      EngineVersion: "10.7"
       MasterUsername: !Ref DbUsername
       MasterUserPassword: !Ref DbPassword
       ScalingConfiguration:
@@ -703,10 +672,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 512
+      Cpu: "512"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-init-efs"
-      Memory: 1024
+      Memory: "1024"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -759,11 +728,11 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-          User: 0
-      Cpu: 512
+          User: "0"
+      Cpu: "512"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-install-senzing"
-      Memory: 4096
+      Memory: "4096"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -821,10 +790,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 512
+      Cpu: "512"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
-      Memory: 1024
+      Memory: "1024"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -883,11 +852,11 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-          User: 0
-      Cpu: 512
+          User: "0"
+      Cpu: "512"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-init-senzing"
-      Memory: 4096
+      Memory: "4096"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -932,10 +901,10 @@ Resources:
               Value: !Sub "${SenzingInputUrl}"
             -
               Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: 60
+              Value: "60"
             -
               Name: SENZING_READ_QUEUE_MAXSIZE
-              Value: 200
+              Value: "200"
             -
               Name: SENZING_RECORD_MAX
               Value: !Sub "${SenzingRecordMax}"
@@ -944,7 +913,7 @@ Resources:
               Value: !Sub "${SenzingRecordMin}"
             -
               Name: SENZING_RECORD_MONITOR
-              Value: 100000
+              Value: "100000"
             -
               Name: SENZING_SQS_QUEUE_URL
               Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
@@ -953,7 +922,7 @@ Resources:
               Value: gzipped-json-to-sqs-batch
             -
               Name: SENZING_THREADS_PER_PRINT
-              Value: 30
+              Value: "30"
           Essential: true
           Image: senzing/stream-producer:1.2.3
           LinuxParameters:
@@ -968,10 +937,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-stream-producer-1"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -998,16 +967,16 @@ Resources:
               Value: TEST
             -
               Name: SENZING_DELAY_IN_SECONDS
-              Value: 900
+              Value: "900"
             -
               Name: SENZING_DELAY_RANDOMIZED
-              Value: true
+              Value: "true"
             -
               Name: SENZING_ENTITY_TYPE
               Value: GENERIC
             -
               Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
-              Value: 600
+              Value: "600"
             -
               Name: SENZING_GOVERNOR_DATABASE_URLS
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
@@ -1016,13 +985,13 @@ Resources:
               Value: info
             -
               Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: 600
+              Value: "600"
             -
               Name: SENZING_PRIME_ENGINE
-              Value: true
+              Value: "true"
             -
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
-              Value: true
+              Value: "true"
             -
               Name: SENZING_SQS_QUEUE_URL
               Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
@@ -1031,7 +1000,7 @@ Resources:
               Value: sqs
             -
               Name: SENZING_THREADS_PER_PROCESS
-              Value: 8
+              Value: "8"
           Essential: true
           Image: senzing/stream-loader:1.6.5
           LinuxParameters:
@@ -1063,10 +1032,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1119,10 +1088,10 @@ Resources:
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
             -
               Name: SENZING_EXIT_ON_THREAD_TERMINATION
-              Value: true
+              Value: "true"
             -
               Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
-              Value: 600
+              Value: "600"
             -
               Name: SENZING_GOVERNOR_DATABASE_URLS
               Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
@@ -1131,10 +1100,10 @@ Resources:
               Value: info
             -
               Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: 600
+              Value: "600"
             -
               Name: SENZING_REDO_SLEEP_TIME_IN_SECONDS
-              Value: 600
+              Value: "600"
             -
               Name: SENZING_SUBCOMMAND
               Value: redo
@@ -1169,10 +1138,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 4096
+      Cpu: "4096"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
-      Memory: 16384
+      Memory: "16384"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1268,10 +1237,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-api-server"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1349,10 +1318,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-sshd"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1417,10 +1386,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-swagger"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1444,7 +1413,7 @@ Resources:
               Value: !Sub "http://${LoadBalancer.DNSName}:8250"
             -
               Name: SENZING_WEB_SERVER_PORT
-              Value: 8251
+              Value: "8251"
           Essential: true
           Image: senzing/entity-search-web-app:2.1.1
           LinuxParameters:
@@ -1463,10 +1432,10 @@ Resources:
           Privileged: false
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
-      Cpu: 1024
+      Cpu: "1024"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       Family: !Sub "${AWS::StackName}-task-definition-webapp"
-      Memory: 8192
+      Memory: "8192"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -1984,6 +1953,7 @@ Resources:
 
 
   LambdaRunnerStreamProducer:
+    Condition: IfRunStreamProducer
     DependsOn:
      - EfsFileSystem
      - EfsMountTarget1
