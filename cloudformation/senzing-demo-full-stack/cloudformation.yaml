@@ -66,7 +66,7 @@ Metadata:
       DbUsername:
         default: "Required: Username for AWS Aurora PostgreSQL serverless database access."
       LogRetentionInDays:
-        default: "Required: The number of days to retain the log events in the log groups."
+        default: "The number of days to retain the log events in the log groups."
       RunSshd:
         default: "Optional: Would you like to run sshd service?"
       RunStreamProducer:
@@ -159,33 +159,33 @@ Parameters:
 
   RunSshd:
     AllowedValues:
-      - No
-      - Yes
-    Default: Yes
+      - "No"
+      - "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
   RunStreamProducer:
     AllowedValues:
-      - No
-      - Yes
-    Default: Yes
+      - "No"
+      - "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
     Type: String
 
   RunSwagger:
     AllowedValues:
-      - No
-      - Yes
-    Default: Yes
+      - "No"
+      - "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
   RunWebApp:
     AllowedValues:
-      - No
-      - Yes
-    Default: Yes
+      - "No"
+      - "Yes"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
     Type: String
 
@@ -277,6 +277,7 @@ Conditions:
 # -----------------------------------------------------------------------------
 
 Resources:
+
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
 
@@ -665,6 +666,21 @@ Resources:
 #   Type: "AWS::Logs::LogGroup"
 #   Properties:
 #     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-debug"
+
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-flowlog.html
+
+  Ec2FlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt IamRoleLambda.Arn
+      LogGroupName: !Ref LogsLogGroup
+      ResourceId: !If
+        - CreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+      ResourceType: VPC
+      TrafficType: ALL
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -1488,6 +1504,26 @@ Resources:
 #    Type: AWS::IAM::AccessKey
 #    Properties:
 
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+# EC2InstancePolicies:
+#   Properties:
+#     PolicyName: !Sub ${AWS::StackName}-ec2-instance-policy-xxx
+#     PolicyDocument:
+#       Version: "2012-10-17"
+#       Statement:
+#         -
+#           Effect: "Allow"
+#           Action: "s3:GetObject"
+#           Resource: "arn:aws:s3:::/"
+#           Condition:
+#             "IpAddress":
+#               "aws:SourceIp": !GetAtt
+#                 - EC2InstanceRosource
+#                 - PublicIp
+#   Type: AWS::IAM::Policy
+
+
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
   IamRoleLambda:
@@ -1527,12 +1563,14 @@ Resources:
                   - sqs:DeleteMessage
                 Effect: Allow
                 Resource:
+
+# FIXME: This doesn't pass https://github.com/stelligent/cfn_nag
+
                   - "*"
 #                 - !GetAtt SqsQueue.Arn
 #                 - !GetAtt SqsQueueDeadLetter.Arn
 #                 - !GetAtt LambdaRunnerInitEfs.Arn
 #                 - !GetAtt LambdaRunnerStreamProducer.Arn
-
 
 #                 - !GetAtt EcsTaskDefinitionStreamLoader.Arn
 #                 - !GetAtt EcsTaskDefinitionRedoer.Arn
@@ -1543,6 +1581,49 @@ Resources:
 #                 - !GetAtt LambdaFunctionSleeper.Arn
 #                 - !GetAtt LambdaFunctionRunTask.Arn
 #                 - !GetAtt LambdaFunctionRunTaskAndWait.Arn
+              -
+                Action:
+                  - iam:PassRole
+                Effect: Allow
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+            Version: '2012-10-17'
+          PolicyName: LambdaFunctionPolicy
+#     RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+    Type: AWS::IAM::Role
+
+
+
+  IamRoleLogging:
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - sqs.amazonaws.com
+      Path: "/"
+      Policies:
+        -
+          PolicyDocument:
+            Statement:
+              -
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource:
+                  - "*"
               -
                 Action:
                   - iam:PassRole
