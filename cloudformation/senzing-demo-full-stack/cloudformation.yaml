@@ -161,7 +161,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
@@ -169,7 +169,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
     Type: String
 
@@ -177,7 +177,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
@@ -195,6 +195,7 @@ Parameters:
     Type: String
 
   SenzingLicenseAsBase64:
+    Default: ""
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinglicenseasbase64"
     Type: String
 
@@ -1193,7 +1194,7 @@ Resources:
           ReadonlyRootFilesystem: false
       Cpu: "4096"
       ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-      Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
+      Family: !Sub "${AWS::StackName}-task-definition-redoer"
       Memory: "16384"
       NetworkMode: awsvpc
       RequiresCompatibilities:
@@ -1566,7 +1567,7 @@ Resources:
 
 # FIXME: This doesn't pass https://github.com/stelligent/cfn_nag
 
-                  - "*"
+#                 - "*"
 #                 - !GetAtt SqsQueue.Arn
 #                 - !GetAtt SqsQueueDeadLetter.Arn
 #                 - !GetAtt LambdaRunnerInitEfs.Arn
