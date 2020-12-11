@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Show RDS bug.
+Resources:
+
+  Ec2Vpc:
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-vpc"
+    Type: AWS::EC2::VPC
+
+  Ec2SubnetPublic1:
+    Properties:
+      AvailabilityZone: !Select
+          - '0'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: 10.0.0.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-1"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+  Ec2SubnetPublic2:
+    Properties:
+      AvailabilityZone: !Select
+          - '1'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: 10.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-2"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+  EcsSecurityGroup:
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        -
+          CidrIp: 0.0.0.0/0
+          Description: HTTP
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        -
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        -
+          CidrIp: 0.0.0.0/0
+          Description: PostgreSQL
+          FromPort: 5432
+          IpProtocol: tcp
+          ToPort: 5432
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::SecurityGroup
+
+  Ec2InternetGateway:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
+    Type: AWS::EC2::InternetGateway
+
+  Ec2VpcGatewayAttachment:
+    Properties:
+      InternetGatewayId: !Ref Ec2InternetGateway
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::VPCGatewayAttachment
+
+  Ec2RouteTable:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::RouteTable
+
+  Ec2Route:
+    DependsOn:
+     - Ec2VpcGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Ec2InternetGateway
+      RouteTableId: !Ref Ec2RouteTable
+    Type: AWS::EC2::Route
+
+  Ec2SubnetRouteTableAssociation1:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTable
+      SubnetId: !Ref Ec2SubnetPublic1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+  Ec2SubnetRouteTableAssociation2:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTable
+      SubnetId: !Ref Ec2SubnetPublic2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+  RdsDbSubnetGroup:
+    Properties:
+      DBSubnetGroupDescription: !Sub "${AWS::StackName}-db-subnet-description"
+      DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet"
+      SubnetIds:
+        - !Ref Ec2SubnetPublic1
+        - !Ref Ec2SubnetPublic2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-subnet-group"
+    Type: AWS::RDS::DBSubnetGroup
+
+  RdsDbClusterParameterGroup:
+    Properties:
+      Description: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group-description"
+      Family: aurora-postgresql10
+      Parameters:
+        "synchronous_commit": "off"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster-parameter-group"
+    Type: AWS::RDS::DBClusterParameterGroup
+
+  RdsDbCluster:
+    Properties:
+      AvailabilityZones:
+        - !GetAtt Ec2SubnetPublic1.AvailabilityZone
+        - !GetAtt Ec2SubnetPublic2.AvailabilityZone
+      DatabaseName: G2
+      DBClusterIdentifier: !Sub "${AWS::StackName}-aurora-cluster"
+      DBClusterParameterGroupName:
+        Ref: RdsDbClusterParameterGroup
+      DBSubnetGroupName:
+        Ref: RdsDbSubnetGroup
+      DeletionProtection: false
+      EnableHttpEndpoint: true
+      EnableIAMDatabaseAuthentication: false
+      Engine: aurora-postgresql
+      EngineMode: serverless
+      EngineVersion: "10.7"
+      MasterUsername: my-user
+      MasterUserPassword: my-password
+      ScalingConfiguration:
+        AutoPause: true
+        MaxCapacity: 192
+        MinCapacity: 2
+        SecondsUntilAutoPause: 3600
+      StorageEncrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rds-db-cluster"
+      VpcSecurityGroupIds:
+        - !Ref EcsSecurityGroup
+    Type: AWS::RDS::DBCluster
