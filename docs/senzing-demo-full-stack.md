@@ -45,7 +45,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    For more information, see [AWS::Logs::LogGroup RetentionInDays](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html#cfn-logs-loggroup-retentionindays).
 1. **Required:** Yes
 1. **Type:** Number
-1. **Allowed values:** 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, and 3653
+1. **Allowed values:** [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653 ]
 1. **Default:** 14
 
 ### RunSshd
@@ -56,7 +56,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    More information at [github.com/Senzing/docker-sshd](https://github.com/Senzing/docker-sshd).
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  ["Yes" | "No" ]
+1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
 
 ### RunStreamProducer
@@ -72,42 +72,37 @@ Technical information on AWS Cloudformation parameters can be seen at
    need to be specified.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  ["Yes" | "No" ]
+1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
 
 ### RunSwagger
 
 1. **Synopsis:**
+   Optionally, run a container that hosts the SwaggerUI for viewing the Senzing REST API OpenAPI document.
+   For more information, see [github.com/Senzing/senzing-rest-api-specification](https://github.com/Senzing/senzing-rest-api-specification).
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  ["Yes" | "No" ]
+1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
 
 ### RunWebApp
 
 1. **Synopsis:**
+   Optionally, run a container that hosts the Senzing Entity Search Web App.
+   For more information, see [github.com/Senzing/entity-search-web-app](https://github.com/Senzing/entity-search-web-app).
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  ["Yes" | "No" ]
+1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** Yes
-
-### SecurityGroupIds
-
-1. **Synopsis:**
-1. **Required:**
-1. **Type:**
-1. **Allowed pattern:**
-1. **Allowed values:**
-1. **Default:**
 
 ### SenzingInputUrl
 
 1. **Synopsis:**
-1. **Required:**
-1. **Type:**
-1. **Allowed pattern:**
-1. **Allowed values:**
-1. **Default:**
+   If using [RunStreamProducer](#runstreamproducer), supply the URL of a tar-gzipped file in JSON-lines format containing records to ingest into Senzing.
+1. **Required:** Yes if running Stream Producer, otherwise no.
+1. **Type:** String
+1. **Allowed pattern:**  A URL starting with `http://` or `https://`.
+1. **Default:** `https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz`
 
 ### SenzingLicenseAsBase64
 

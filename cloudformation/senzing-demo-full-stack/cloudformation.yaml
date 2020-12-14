@@ -161,7 +161,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
@@ -169,7 +169,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
     Type: String
 
@@ -177,7 +177,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
@@ -185,7 +185,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
     Type: String
 
@@ -1874,7 +1874,45 @@ Resources:
        - !Ref IamRoleInstallSenzing
        - !Ref IamRoleInitPostgres
        - !Ref IamRoleInitSenzing
+       - !Ref IamRoleStreamProducer
+       - !Ref IamRoleStreamLoader
     Type: AWS::IAM::Policy
+
+
+  IamPolicySqsConsumer:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-consumer
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleStreamLoader
+    Type: AWS::IAM::Policy
+
+
+  IamPolicySqsProducer:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-producer
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - sqs:SendMessage
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleStreamProducer
+    Type: AWS::IAM::Policy
+
 
 # -- LambdaFunction -----------------------------------------------------------
 
