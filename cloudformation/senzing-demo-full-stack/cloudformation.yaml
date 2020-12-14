@@ -727,7 +727,6 @@ Resources:
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
       Cpu: "512"
-#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
       ExecutionRoleArn: !GetAtt IamRoleInitEfs.Arn
       Family: !Sub "${AWS::StackName}-task-definition-init-efs"
       Memory: "1024"
@@ -785,7 +784,7 @@ Resources:
           ReadonlyRootFilesystem: false
           User: "0"
       Cpu: "512"
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      ExecutionRoleArn: !GetAtt IamRoleInstallSenzing.Arn
       Family: !Sub "${AWS::StackName}-task-definition-install-senzing"
       Memory: "4096"
       NetworkMode: awsvpc
@@ -846,7 +845,7 @@ Resources:
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
       Cpu: "512"
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      ExecutionRoleArn: !GetAtt IamRoleInitPostgres.Arn
       Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
       Memory: "1024"
       NetworkMode: awsvpc
@@ -909,7 +908,7 @@ Resources:
           ReadonlyRootFilesystem: false
           User: "0"
       Cpu: "512"
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      ExecutionRoleArn: !GetAtt IamRoleInitSenzing.Arn
       Family: !Sub "${AWS::StackName}-task-definition-init-senzing"
       Memory: "4096"
       NetworkMode: awsvpc
@@ -1580,7 +1579,7 @@ Resources:
     Type: AWS::IAM::Role
 
 
-  IamRoleInitStack:
+  IamRoleInstallSenzing:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -1590,12 +1589,50 @@ Resources:
             Effect: Allow
             Principal:
               Service:
-                - sqs.amazonaws.com
+                - ecs-tasks.amazonaws.com
         Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-stream-producer"
+      Description: !Sub "${AWS::StackName}-iam-role-install-senzing"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-stream-producer"
+          Value: !Sub "${AWS::StackName}-iam-role-install-senzing"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitPostgres:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-postgres"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-postgres"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitSenzing:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-senzing"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-senzing"
     Type: AWS::IAM::Role
 
 
@@ -1763,48 +1800,6 @@ Resources:
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
     Type: AWS::IAM::Role
 
-
-  xIamRoleLogging:
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-                - lambda.amazonaws.com
-                - sqs.amazonaws.com
-      Path: "/"
-      Policies:
-        -
-          PolicyDocument:
-            Statement:
-              -
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Effect: Allow
-                Resource:
-                  - "*"
-              -
-                Action:
-                  - iam:PassRole
-                Effect: Allow
-                Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
-            Version: '2012-10-17'
-          PolicyName: LambdaFunctionPolicy
-#     RoleName: !Sub "${AWS::StackName}-iam-role-lambda"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-lambda"
-    Type: AWS::IAM::Role
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
 
   IamPolicyEcsTaskExecution:
@@ -1845,22 +1840,40 @@ Resources:
     Type: AWS::IAM::Policy
 
 
-  IamPolicyLoggingCreate:
+  IamPolicyLoggingCreateGroup:
     Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-group
       PolicyDocument:
         Statement:
           -
             Action:
               - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
             Effect: Allow
             Resource:
               - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleInitEfs
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyLoggingCreateStream:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-stream
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogStream
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleInstallSenzing
+       - !Ref IamRoleInitPostgres
+       - !Ref IamRoleInitSenzing
     Type: AWS::IAM::Policy
 
 # -- LambdaFunction -----------------------------------------------------------
