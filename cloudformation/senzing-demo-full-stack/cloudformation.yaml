@@ -161,7 +161,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
@@ -169,7 +169,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
     Type: String
 
@@ -177,7 +177,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
@@ -185,7 +185,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
     Type: String
 
@@ -671,17 +671,17 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-flowlog.html
 
-  Ec2FlowLog:
-    Type: AWS::EC2::FlowLog
-    Properties:
-      DeliverLogsPermissionArn: !GetAtt IamRoleLambda.Arn
-      LogGroupName: !Ref LogsLogGroup
-      ResourceId: !If
-        - CreateVpcResources
-        - !Ref Ec2Vpc
-        - !Ref VpcId
-      ResourceType: VPC
-      TrafficType: ALL
+# Ec2FlowLog:
+#   Type: AWS::EC2::FlowLog
+#   Properties:
+#     DeliverLogsPermissionArn: !GetAtt IamRoleLambda.Arn
+#     LogGroupName: !Ref LogsLogGroup
+#     ResourceId: !If
+#       - CreateVpcResources
+#       - !Ref Ec2Vpc
+#       - !Ref VpcId
+#     ResourceType: VPC
+#     TrafficType: ALL
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -727,7 +727,8 @@ Resources:
           PseudoTerminal: false
           ReadonlyRootFilesystem: false
       Cpu: "512"
-      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+#     ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      ExecutionRoleArn: !GetAtt IamRoleInitEfs.Arn
       Family: !Sub "${AWS::StackName}-task-definition-init-efs"
       Memory: "1024"
       NetworkMode: awsvpc
@@ -1501,31 +1502,198 @@ Resources:
 
 # -- Iam -----------------------------------------------------------------
 
-#  IamAccessKeyLambda:
-#    Type: AWS::IAM::AccessKey
-#    Properties:
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
-
-# EC2InstancePolicies:
-#   Properties:
-#     PolicyName: !Sub ${AWS::StackName}-ec2-instance-policy-xxx
-#     PolicyDocument:
-#       Version: "2012-10-17"
-#       Statement:
-#         -
-#           Effect: "Allow"
-#           Action: "s3:GetObject"
-#           Resource: "arn:aws:s3:::/"
-#           Condition:
-#             "IpAddress":
-#               "aws:SourceIp": !GetAtt
-#                 - EC2InstanceRosource
-#                 - PublicIp
-#   Type: AWS::IAM::Policy
-
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleApiServer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-api-server"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-api-server"
+    Type: AWS::IAM::Role
+
+
+  IamRoleDebug:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-debug"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-debug"
+    Type: AWS::IAM::Role
+
+
+  IamRoleEcsTaskExecution:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+      RoleName: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitEfs:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-efs"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-efs"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitStack:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-stream-producer"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-stream-producer"
+    Type: AWS::IAM::Role
+
+
+  IamRoleRedoer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-redoer"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-redoer"
+    Type: AWS::IAM::Role
+
+
+  IamRoleStreamLoader:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-stream-loader"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-stream-loader"
+    Type: AWS::IAM::Role
+
+
+  IamRoleStreamProducer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-stream-producer"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-stream-producer"
+    Type: AWS::IAM::Role
+
+
+  IamRoleSwagger:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-swagger"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-swagger"
+    Type: AWS::IAM::Role
+
+
+  IamRoleWebApp:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-web-app"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-web-app"
+    Type: AWS::IAM::Role
+
 
   IamRoleLambda:
     Properties:
@@ -1567,7 +1735,7 @@ Resources:
 
 # FIXME: This doesn't pass https://github.com/stelligent/cfn_nag
 
-#                 - "*"
+                  - "*"
 #                 - !GetAtt SqsQueue.Arn
 #                 - !GetAtt SqsQueueDeadLetter.Arn
 #                 - !GetAtt LambdaRunnerInitEfs.Arn
@@ -1597,8 +1765,7 @@ Resources:
     Type: AWS::IAM::Role
 
 
-
-  IamRoleLogging:
+  xIamRoleLogging:
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -1638,6 +1805,45 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
     Type: AWS::IAM::Role
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+  IamPolicyEcsTaskExecution:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyEcsTaskExecutionPassRole:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !Ref IamPolicyEcsTaskExecution
+        Version: "2012-10-17"
+      Roles:
+       - !GetAtt IamRoleEcsTaskExecution.Arn
+    Type: AWS::IAM::Policy
 
 # -- LambdaFunction -----------------------------------------------------------
 
