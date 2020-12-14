@@ -1555,7 +1555,6 @@ Resources:
                 - ecs-tasks.amazonaws.com
         Version: '2012-10-17'
       Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
-      RoleName: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
@@ -1572,7 +1571,7 @@ Resources:
             Effect: Allow
             Principal:
               Service:
-                - sqs.amazonaws.com
+                - ecs-tasks.amazonaws.com
         Version: '2012-10-17'
       Description: !Sub "${AWS::StackName}-iam-role-init-efs"
       Tags:
@@ -1839,10 +1838,29 @@ Resources:
               - iam:PassRole
             Effect: Allow
             Resource:
-              - !Ref IamPolicyEcsTaskExecution
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
         Version: "2012-10-17"
       Roles:
-       - !GetAtt IamRoleEcsTaskExecution.Arn
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyLoggingCreate:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
     Type: AWS::IAM::Policy
 
 # -- LambdaFunction -----------------------------------------------------------
@@ -2153,6 +2171,7 @@ Resources:
 # -- Run ECS tasks-------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
 
 # LambdaRunnerDebug:
 #   DependsOn: LambdaFunctionDebug
