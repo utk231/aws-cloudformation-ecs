@@ -124,6 +124,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    ```console
    base64 /opt/senzing/etc/g2.lic
    ```
+
    Copy the entire output from the command and paste into the text entry field.
 1. **Required:** Only if ingesting more than 100,000 records.
 1. **Type:** String

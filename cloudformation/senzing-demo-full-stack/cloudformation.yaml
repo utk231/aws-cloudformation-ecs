@@ -279,6 +279,454 @@ Conditions:
 
 Resources:
 
+# -- Iam -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleApiServer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-api-server"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-api-server"
+    Type: AWS::IAM::Role
+
+
+  IamRoleDebug:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-debug"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-debug"
+    Type: AWS::IAM::Role
+
+
+  IamRoleEcsTaskExecution:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitEfs:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-efs"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-efs"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitPostgres:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-postgres"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-postgres"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInitSenzing:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-senzing"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-senzing"
+    Type: AWS::IAM::Role
+
+
+  IamRoleInstallSenzing:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-install-senzing"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-install-senzing"
+    Type: AWS::IAM::Role
+
+
+  IamRoleLambda:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+    Type: AWS::IAM::Role
+
+
+  IamRoleRedoer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-redoer"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-redoer"
+    Type: AWS::IAM::Role
+
+
+  IamRoleSshd:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-sshd"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-sshd"
+    Type: AWS::IAM::Role
+
+
+  IamRoleStreamLoader:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-stream-loader"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-stream-loader"
+    Type: AWS::IAM::Role
+
+
+  IamRoleStreamProducer:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-stream-producer"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-stream-producer"
+    Type: AWS::IAM::Role
+
+
+  IamRoleSwagger:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-swagger"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-swagger"
+    Type: AWS::IAM::Role
+
+
+  IamRoleWebApp:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-web-app"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-web-app"
+    Type: AWS::IAM::Role
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+  IamPolicyEcsTaskExecution:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyEcsTaskExecutionPassRole:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyLambdaTemporary:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-lambda-temporary
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - ec2:AttachNetworkInterface
+              - ec2:CreateNetworkInterface
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeInstances
+              - ec2:DescribeNetworkInterfaces
+              - ecs:DescribeTasks
+              - ecs:RunTask
+              - iam:PassRole
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - sqs:ReceiveMessage
+              - sqs:SendMessage
+              - sqs:DeleteMessage
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyLoggingCreateGroup:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-group
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogGroup
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyLoggingCreateStream:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-stream
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogStream
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleApiServer
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleInitPostgres
+       - !Ref IamRoleInitSenzing
+       - !Ref IamRoleInstallSenzing
+       - !Ref IamRoleLambda
+       - !Ref IamRoleRedoer
+       - !Ref IamRoleSshd
+       - !Ref IamRoleStreamLoader
+       - !Ref IamRoleStreamProducer
+       - !Ref IamRoleSwagger
+       - !Ref IamRoleWebApp
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyTaskRunner:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-task-runner
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - ecs:DescribeTasks
+              - ecs:RunTask
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleApiServer
+       - !Ref IamRoleLambda
+       - !Ref IamRoleRedoer
+       - !Ref IamRoleSshd
+       - !Ref IamRoleStreamLoader
+       - !Ref IamRoleSwagger
+       - !Ref IamRoleWebApp
+    Type: AWS::IAM::Policy
+
+
+  IamPolicySqsConsumer:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-consumer
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleStreamLoader
+    Type: AWS::IAM::Policy
+
+
+  IamPolicySqsProducer:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-producer
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - sqs:SendMessage
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleStreamProducer
+    Type: AWS::IAM::Policy
+
+
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
 
   Ec2Vpc:
@@ -681,1269 +1129,6 @@ Resources:
 #       - !Ref VpcId
 #     ResourceType: VPC
 #     TrafficType: ALL
-
-# -- EcsTaskDefinition --------------------------------------------------------
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
-
-  EcsTaskDefinitionInitEfs:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Command:
-            - "mkdir"
-            - "/efs/g2"
-            - "&&"
-            - "mkdir"
-            - "-p"
-            - "/efs/data/1.0.0"
-            - "&&"
-            - "mkdir"
-            - "/efs/etc"
-            - "&&"
-            - "mkdir"
-            - "/efs/var"
-          Essential: true
-          Image: busybox
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: job
-          MountPoints:
-            -
-              SourceVolume: senzing-efs-root
-              ContainerPath: /efs
-              ReadOnly: false
-          Name: efsinitcontainer
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "512"
-      ExecutionRoleArn: !GetAtt IamRoleInitEfs.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-init-efs"
-      Memory: "1024"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
-      Volumes:
-        -
-          Name: senzing-efs-root
-          EFSVolumeConfiguration:
-            AuthorizationConfig: {}
-            FilesystemId:
-              Ref: EfsFileSystem
-            RootDirectory: "/"
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionInstallSenzing:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_ACCEPT_EULA
-              Value: !Ref AcceptEula
-          Essential: true
-          Image: senzing/yum:1.1.3
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: job
-          MountPoints:
-            -
-              SourceVolume: senzing-data-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: false
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: false
-
-          Name: yum
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-          User: "0"
-      Cpu: "512"
-      ExecutionRoleArn: !GetAtt IamRoleInstallSenzing.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-install-senzing"
-      Memory: "4096"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-install-senzing"
-      Volumes:
-        -
-          Name: senzing-data-dir
-          EFSVolumeConfiguration:
-            AuthorizationConfig: {}
-            FilesystemId:
-              Ref: EfsFileSystem
-            RootDirectory: /data
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-            AuthorizationConfig: {}
-            FilesystemId:
-              Ref: EfsFileSystem
-            RootDirectory: /g2
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionInitPostgres:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_DATABASE_URL
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_SQL_FILE
-              Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
-          Essential: true
-          Image: senzing/postgresql-client:1.0.0
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: job
-          MountPoints:
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: true
-          Name: postgresinit
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "512"
-      ExecutionRoleArn: !GetAtt IamRoleInitPostgres.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
-      Memory: "1024"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-postgres"
-      Volumes:
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-            AuthorizationConfig: {}
-            FilesystemId:
-              Ref: EfsFileSystem
-            RootDirectory: /g2
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionInitSenzing:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_DATABASE_URL
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_LICENSE_BASE64_ENCODED
-              Value: !Sub "${SenzingLicenseAsBase64}"
-          Essential: true
-          Image: senzing/init-container:1.6.3
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: job
-          MountPoints:
-            -
-              SourceVolume: senzing-data-version-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: true
-            -
-              SourceVolume: senzing-etc-dir
-              ContainerPath: /etc/opt/senzing
-              ReadOnly: false
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: false
-          Name: initcontainer
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-          User: "0"
-      Cpu: "512"
-      ExecutionRoleArn: !GetAtt IamRoleInitSenzing.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-init-senzing"
-      Memory: "4096"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
-      Volumes:
-        -
-          Name: senzing-data-version-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /data/1.0.0
-        -
-          Name: senzing-etc-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /etc
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /g2
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionStreamProducer:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_INPUT_URL
-              Value: !Sub "${SenzingInputUrl}"
-            -
-              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: "60"
-            -
-              Name: SENZING_READ_QUEUE_MAXSIZE
-              Value: "200"
-            -
-              Name: SENZING_RECORD_MAX
-              Value: !Sub "${SenzingRecordMax}"
-            -
-              Name: SENZING_RECORD_MIN
-              Value: !Sub "${SenzingRecordMin}"
-            -
-              Name: SENZING_RECORD_MONITOR
-              Value: "100000"
-            -
-              Name: SENZING_SQS_QUEUE_URL
-              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
-            -
-              Name: SENZING_SUBCOMMAND
-              Value: gzipped-json-to-sqs-batch
-            -
-              Name: SENZING_THREADS_PER_PRINT
-              Value: "30"
-          Essential: true
-          Image: senzing/stream-producer:1.2.3
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: job
-          Name: producer1
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleStreamProducer.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-stream-producer-1"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-producer"
-      TaskRoleArn: !GetAtt IamRoleStreamProducer.Arn
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionStreamLoader:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_DATABASE_URL
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_DATA_SOURCE
-              Value: TEST
-            -
-              Name: SENZING_DELAY_IN_SECONDS
-              Value: "900"
-            -
-              Name: SENZING_DELAY_RANDOMIZED
-              Value: "true"
-            -
-              Name: SENZING_ENTITY_TYPE
-              Value: GENERIC
-            -
-              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
-              Value: "600"
-            -
-              Name: SENZING_GOVERNOR_DATABASE_URLS
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_LOG_LEVEL
-              Value: info
-            -
-              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: "600"
-            -
-              Name: SENZING_PRIME_ENGINE
-              Value: "true"
-            -
-              Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
-              Value: "true"
-            -
-              Name: SENZING_SQS_QUEUE_URL
-              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
-            -
-              Name: SENZING_SUBCOMMAND
-              Value: sqs
-            -
-              Name: SENZING_THREADS_PER_PROCESS
-              Value: "8"
-          Essential: true
-          Image: senzing/stream-loader:1.6.5
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          MountPoints:
-            -
-              SourceVolume: senzing-data-version-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: true
-            -
-              SourceVolume: senzing-etc-dir
-              ContainerPath: /etc/opt/senzing
-              ReadOnly: true
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: true
-            -
-              SourceVolume: senzing-var-dir
-              ContainerPath: /var/opt/senzing
-              ReadOnly: false
-          Name: stream-loader
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleStreamLoader.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-loader"
-      TaskRoleArn: !GetAtt IamRoleStreamLoader.Arn
-      Volumes:
-        -
-          Name: senzing-data-version-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /data/1.0.0
-        -
-          Name: senzing-etc-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /etc
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /g2
-        -
-          Name: senzing-var-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /var
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionRedoer:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_DATABASE_URL
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_EXIT_ON_THREAD_TERMINATION
-              Value: "true"
-            -
-              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
-              Value: "600"
-            -
-              Name: SENZING_GOVERNOR_DATABASE_URLS
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-            -
-              Name: SENZING_LOG_LEVEL
-              Value: info
-            -
-              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
-              Value: "600"
-            -
-              Name: SENZING_REDO_SLEEP_TIME_IN_SECONDS
-              Value: "600"
-            -
-              Name: SENZING_SUBCOMMAND
-              Value: redo
-          Essential: true
-          Image: senzing/redoer:1.3.4
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          MountPoints:
-            -
-              SourceVolume: senzing-data-version-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: true
-            -
-              SourceVolume: senzing-etc-dir
-              ContainerPath: /etc/opt/senzing
-              ReadOnly: true
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: true
-            -
-              SourceVolume: senzing-var-dir
-              ContainerPath: /var/opt/senzing
-              ReadOnly: false
-          Name: redoer
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "4096"
-      ExecutionRoleArn: !GetAtt IamRoleRedoer.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-redoer"
-      Memory: "16384"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-redoer"
-      TaskRoleArn: !GetAtt IamRoleRedoer.Arn
-      Volumes:
-        -
-          Name: senzing-data-version-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /data/1.0.0
-        -
-          Name: senzing-etc-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /etc
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /g2
-        -
-          Name: senzing-var-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /var
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionApiServer:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Command:
-            - -httpPort
-            - "8250"
-            - -bindAddr
-            - all
-            - -iniFile
-            - /etc/opt/senzing/G2Module.ini
-            - -allowedOrigins
-            - "*"
-            - -enableAdmin
-          Environment:
-            -
-              Name: SENZING_DATABASE_URL
-              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
-          Essential: true
-          Image: senzing/senzing-api-server:2.3.0
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          MountPoints:
-            -
-              SourceVolume: senzing-data-version-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: true
-            -
-              SourceVolume: senzing-etc-dir
-              ContainerPath: /etc/opt/senzing
-              ReadOnly: true
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: true
-            -
-              SourceVolume: senzing-var-dir
-              ContainerPath: /var/opt/senzing
-              ReadOnly: false
-          Name: api-server
-          PortMappings:
-            - ContainerPort: 8250
-              HostPort: 8250
-              Protocol: tcp
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleApiServer.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-api-server"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-api-server"
-      TaskRoleArn: !GetAtt IamRoleApiServer.Arn
-      Volumes:
-        -
-          Name: senzing-data-version-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /data/1.0.0
-        -
-          Name: senzing-etc-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /etc
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /g2
-        -
-          Name: senzing-var-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /var
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionSshd:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Essential: true
-          Image: senzing/sshd:1.0.2
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          MountPoints:
-            -
-              SourceVolume: senzing-data-version-dir
-              ContainerPath: /opt/senzing/data
-              ReadOnly: false
-            -
-              SourceVolume: senzing-etc-dir
-              ContainerPath: /etc/opt/senzing
-              ReadOnly: false
-            -
-              SourceVolume: senzing-g2-dir
-              ContainerPath: /opt/senzing/g2
-              ReadOnly: false
-            -
-              SourceVolume: senzing-var-dir
-              ContainerPath: /var/opt/senzing
-              ReadOnly: false
-          Name: sshd
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleSshd.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-sshd"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-sshd"
-      Volumes:
-        -
-          Name: senzing-data-version-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /data/1.0.0
-        -
-          Name: senzing-etc-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /etc
-        -
-          Name: senzing-g2-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /g2
-        -
-          Name: senzing-var-dir
-          EFSVolumeConfiguration:
-              AuthorizationConfig: {}
-              FilesystemId:
-                Ref: EfsFileSystem
-              RootDirectory: /var
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionSwagger:
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: URL
-              Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
-          Essential: true
-          Image: swaggerapi/swagger-ui:latest
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          Name: swagger
-          PortMappings:
-            - ContainerPort: 8080
-              HostPort: 8080
-              Protocol: tcp
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleSwagger.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-swagger"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-swagger"
-      TaskRoleArn: !GetAtt IamRoleSwagger.Arn
-    Type: AWS::ECS::TaskDefinition
-
-
-  EcsTaskDefinitionWebApp:
-    DependsOn:
-      - EfsMountTarget1
-      - EfsMountTarget2
-    Properties:
-      ContainerDefinitions:
-        -
-          Environment:
-            -
-              Name: SENZING_API_SERVER_URL
-              Value: !Sub "http://${LoadBalancer.DNSName}:8250"
-            -
-              Name: SENZING_WEB_SERVER_PORT
-              Value: "8251"
-          Essential: true
-          Image: senzing/entity-search-web-app:2.1.1
-          LinuxParameters:
-            Capabilities: {}
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Sub "${AWS::StackName}-log-group"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: service
-          Name: webapp
-          PortMappings:
-            - ContainerPort: 8251
-              HostPort: 8251
-              Protocol: tcp
-          Privileged: false
-          PseudoTerminal: false
-          ReadonlyRootFilesystem: false
-      Cpu: "1024"
-      ExecutionRoleArn: !GetAtt IamRoleWebApp.Arn
-      Family: !Sub "${AWS::StackName}-task-definition-webapp"
-      Memory: "8192"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-task-definition-webapp"
-      TaskRoleArn: !GetAtt IamRoleWebApp.Arn
-    Type: AWS::ECS::TaskDefinition
-
-# -- Iam -----------------------------------------------------------------
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
-
-  IamRoleApiServer:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-api-server"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-api-server"
-    Type: AWS::IAM::Role
-
-
-  IamRoleDebug:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-debug"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-debug"
-    Type: AWS::IAM::Role
-
-
-  IamRoleEcsTaskExecution:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
-    Type: AWS::IAM::Role
-
-
-  IamRoleInitEfs:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-init-efs"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-init-efs"
-    Type: AWS::IAM::Role
-
-
-  IamRoleInstallSenzing:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-install-senzing"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-install-senzing"
-    Type: AWS::IAM::Role
-
-
-  IamRoleInitPostgres:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-init-postgres"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-init-postgres"
-    Type: AWS::IAM::Role
-
-
-  IamRoleInitSenzing:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-init-senzing"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-init-senzing"
-    Type: AWS::IAM::Role
-
-
-  IamRoleLambda:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-                - lambda.amazonaws.com
-                - sqs.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-lambda"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-lambda"
-    Type: AWS::IAM::Role
-
-
-  IamRoleRedoer:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-redoer"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-redoer"
-    Type: AWS::IAM::Role
-
-
-  IamRoleSshd:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-sshd"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-sshd"
-    Type: AWS::IAM::Role
-
-
-  IamRoleStreamLoader:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-                - sqs.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-stream-loader"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-stream-loader"
-    Type: AWS::IAM::Role
-
-
-  IamRoleStreamProducer:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-                - sqs.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-stream-producer"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-stream-producer"
-    Type: AWS::IAM::Role
-
-
-  IamRoleSwagger:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-swagger"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-swagger"
-    Type: AWS::IAM::Role
-
-
-  IamRoleWebApp:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-web-app"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-web-app"
-    Type: AWS::IAM::Role
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
-
-  IamPolicyEcsTaskExecution:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
-      PolicyDocument:
-        Statement:
-          -
-            Effect: "Allow"
-            Action:
-              - ecr:GetAuthorizationToken
-              - ecr:BatchCheckLayerAvailability
-              - ecr:GetDownloadUrlForLayer
-              - ecr:BatchGetImage
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource: "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleEcsTaskExecution
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyEcsTaskExecutionPassRole:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - iam:PassRole
-            Effect: Allow
-            Resource:
-              - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleEcsTaskExecution
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyLambdaTemporary:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-lambda-temporary
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - ec2:AttachNetworkInterface
-              - ec2:CreateNetworkInterface
-              - ec2:DeleteNetworkInterface
-              - ec2:DescribeInstances
-              - ec2:DescribeNetworkInterfaces
-              - ecs:DescribeTasks
-              - ecs:RunTask
-              - iam:PassRole
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-              - sqs:ReceiveMessage
-              - sqs:SendMessage
-              - sqs:DeleteMessage
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleLambda
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyLoggingCreateGroup:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-group
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - logs:CreateLogGroup
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleInitEfs
-       - !Ref IamRoleLambda
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyLoggingCreateStream:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-stream
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - logs:CreateLogStream
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleApiServer
-       - !Ref IamRoleInitEfs
-       - !Ref IamRoleInitPostgres
-       - !Ref IamRoleInitSenzing
-       - !Ref IamRoleInstallSenzing
-       - !Ref IamRoleLambda
-       - !Ref IamRoleRedoer
-       - !Ref IamRoleSshd
-       - !Ref IamRoleStreamLoader
-       - !Ref IamRoleStreamProducer
-       - !Ref IamRoleSwagger
-       - !Ref IamRoleWebApp
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyTaskRunner:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-task-runner
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - ecs:DescribeTasks
-              - ecs:RunTask
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleApiServer
-       - !Ref IamRoleLambda
-       - !Ref IamRoleRedoer
-       - !Ref IamRoleSshd
-       - !Ref IamRoleStreamLoader
-       - !Ref IamRoleSwagger
-       - !Ref IamRoleWebApp
-    Type: AWS::IAM::Policy
-
-
-  IamPolicySqsConsumer:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-consumer
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - sqs:ReceiveMessage
-              - sqs:DeleteMessage
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleStreamLoader
-    Type: AWS::IAM::Policy
-
-
-  IamPolicySqsProducer:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-sqs-producer
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - sqs:SendMessage
-            Effect: Allow
-            Resource:
-              - "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleStreamProducer
-    Type: AWS::IAM::Policy
 
 
 # -- LambdaFunction -----------------------------------------------------------
@@ -2565,6 +1750,824 @@ Resources:
       Protocol: HTTP
     Type: AWS::ElasticLoadBalancingV2::Listener
 
+
+# -- EcsTaskDefinition --------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+
+  EcsTaskDefinitionApiServer:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Command:
+            - -httpPort
+            - "8250"
+            - -bindAddr
+            - all
+            - -iniFile
+            - /etc/opt/senzing/G2Module.ini
+            - -allowedOrigins
+            - "*"
+            - -enableAdmin
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+          Essential: true
+          Image: senzing/senzing-api-server:2.3.0
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: true
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: api-server
+          PortMappings:
+            - ContainerPort: 8250
+              HostPort: 8250
+              Protocol: tcp
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleApiServer.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-api-server"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-api-server"
+      TaskRoleArn: !GetAtt IamRoleApiServer.Arn
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionInitEfs:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Command:
+            - "mkdir"
+            - "/efs/g2"
+            - "&&"
+            - "mkdir"
+            - "-p"
+            - "/efs/data/1.0.0"
+            - "&&"
+            - "mkdir"
+            - "/efs/etc"
+            - "&&"
+            - "mkdir"
+            - "/efs/var"
+          Essential: true
+          Image: busybox
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-efs-root
+              ContainerPath: /efs
+              ReadOnly: false
+          Name: efsinitcontainer
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "512"
+      ExecutionRoleArn: !GetAtt IamRoleInitEfs.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-init-efs"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
+      Volumes:
+        -
+          Name: senzing-efs-root
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/"
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionInitPostgres:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_SQL_FILE
+              Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
+          Essential: true
+          Image: senzing/postgresql-client:1.0.0
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+          Name: postgresinit
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "512"
+      ExecutionRoleArn: !GetAtt IamRoleInitPostgres.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-init-postgres"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-postgres"
+      Volumes:
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: /g2
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionInitSenzing:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_LICENSE_BASE64_ENCODED
+              Value: !Sub "${SenzingLicenseAsBase64}"
+          Essential: true
+          Image: senzing/init-container:1.6.3
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: false
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: false
+          Name: initcontainer
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+          User: "0"
+      Cpu: "512"
+      ExecutionRoleArn: !GetAtt IamRoleInitSenzing.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-init-senzing"
+      Memory: "4096"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionInstallSenzing:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_ACCEPT_EULA
+              Value: !Ref AcceptEula
+          Essential: true
+          Image: senzing/yum:1.1.3
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-data-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: false
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: false
+
+          Name: yum
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+          User: "0"
+      Cpu: "512"
+      ExecutionRoleArn: !GetAtt IamRoleInstallSenzing.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-install-senzing"
+      Memory: "4096"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-install-senzing"
+      Volumes:
+        -
+          Name: senzing-data-dir
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: /data
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: /g2
+    Type: AWS::ECS::TaskDefinition
+
+
+
+  EcsTaskDefinitionRedoer:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_EXIT_ON_THREAD_TERMINATION
+              Value: "true"
+            -
+              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
+              Value: "600"
+            -
+              Name: SENZING_GOVERNOR_DATABASE_URLS
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_LOG_LEVEL
+              Value: info
+            -
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: "600"
+            -
+              Name: SENZING_REDO_SLEEP_TIME_IN_SECONDS
+              Value: "600"
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: redo
+          Essential: true
+          Image: senzing/redoer:1.3.4
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: true
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: redoer
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "4096"
+      ExecutionRoleArn: !GetAtt IamRoleRedoer.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-redoer"
+      Memory: "16384"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-redoer"
+      TaskRoleArn: !GetAtt IamRoleRedoer.Arn
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionSshd:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Essential: true
+          Image: senzing/sshd:1.0.2
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: false
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: false
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: false
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: sshd
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleSshd.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-sshd"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-sshd"
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionStreamLoader:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_DATABASE_URL
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_DATA_SOURCE
+              Value: TEST
+            -
+              Name: SENZING_DELAY_IN_SECONDS
+              Value: "900"
+            -
+              Name: SENZING_DELAY_RANDOMIZED
+              Value: "true"
+            -
+              Name: SENZING_ENTITY_TYPE
+              Value: GENERIC
+            -
+              Name: SENZING_GOVERNOR_CHECK_TIME_INTERVAL_IN_SECONDS
+              Value: "600"
+            -
+              Name: SENZING_GOVERNOR_DATABASE_URLS
+              Value: !Sub "postgresql://${DbUsername}:${DbPassword}@${RdsDbCluster.Endpoint.Address}:${RdsDbCluster.Endpoint.Port}/G2"
+            -
+              Name: SENZING_LOG_LEVEL
+              Value: info
+            -
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: "600"
+            -
+              Name: SENZING_PRIME_ENGINE
+              Value: "true"
+            -
+              Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
+              Value: "true"
+            -
+              Name: SENZING_SQS_QUEUE_URL
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: sqs
+            -
+              Name: SENZING_THREADS_PER_PROCESS
+              Value: "8"
+          Essential: true
+          Image: senzing/stream-loader:1.6.5
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          MountPoints:
+            -
+              SourceVolume: senzing-data-version-dir
+              ContainerPath: /opt/senzing/data
+              ReadOnly: true
+            -
+              SourceVolume: senzing-etc-dir
+              ContainerPath: /etc/opt/senzing
+              ReadOnly: true
+            -
+              SourceVolume: senzing-g2-dir
+              ContainerPath: /opt/senzing/g2
+              ReadOnly: true
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
+          Name: stream-loader
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleStreamLoader.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-stream-loader"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-loader"
+      TaskRoleArn: !GetAtt IamRoleStreamLoader.Arn
+      Volumes:
+        -
+          Name: senzing-data-version-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /data/1.0.0
+        -
+          Name: senzing-etc-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /etc
+        -
+          Name: senzing-g2-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /g2
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionStreamProducer:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_INPUT_URL
+              Value: !Sub "${SenzingInputUrl}"
+            -
+              Name: SENZING_MONITORING_PERIOD_IN_SECONDS
+              Value: "60"
+            -
+              Name: SENZING_READ_QUEUE_MAXSIZE
+              Value: "200"
+            -
+              Name: SENZING_RECORD_MAX
+              Value: !Sub "${SenzingRecordMax}"
+            -
+              Name: SENZING_RECORD_MIN
+              Value: !Sub "${SenzingRecordMin}"
+            -
+              Name: SENZING_RECORD_MONITOR
+              Value: "100000"
+            -
+              Name: SENZING_SQS_QUEUE_URL
+              Value: !Sub "https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/${SqsQueue.QueueName}"
+            -
+              Name: SENZING_SUBCOMMAND
+              Value: gzipped-json-to-sqs-batch
+            -
+              Name: SENZING_THREADS_PER_PRINT
+              Value: "30"
+          Essential: true
+          Image: senzing/stream-producer:1.2.3
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          Name: producer1
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleStreamProducer.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-stream-producer-1"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-producer"
+      TaskRoleArn: !GetAtt IamRoleStreamProducer.Arn
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionSwagger:
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: URL
+              Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
+          Essential: true
+          Image: swaggerapi/swagger-ui:latest
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          Name: swagger
+          PortMappings:
+            - ContainerPort: 8080
+              HostPort: 8080
+              Protocol: tcp
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleSwagger.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-swagger"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-swagger"
+      TaskRoleArn: !GetAtt IamRoleSwagger.Arn
+    Type: AWS::ECS::TaskDefinition
+
+
+  EcsTaskDefinitionWebApp:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: SENZING_API_SERVER_URL
+              Value: !Sub "http://${LoadBalancer.DNSName}:8250"
+            -
+              Name: SENZING_WEB_SERVER_PORT
+              Value: "8251"
+          Essential: true
+          Image: senzing/entity-search-web-app:2.1.1
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          Name: webapp
+          PortMappings:
+            - ContainerPort: 8251
+              HostPort: 8251
+              Protocol: tcp
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt IamRoleWebApp.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-webapp"
+      Memory: "8192"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-webapp"
+      TaskRoleArn: !GetAtt IamRoleWebApp.Arn
+    Type: AWS::ECS::TaskDefinition
+
 # -- EcsService ---------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
@@ -2596,32 +2599,6 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-service-api-server"
       TaskDefinition: !Ref EcsTaskDefinitionApiServer
-    Type: AWS::ECS::Service
-
-
-  EcsServiceStreamLoader:
-    DependsOn:
-     - LambdaRunnerInitSenzing
-    Properties:
-      Cluster: !Ref EcsCluster
-      DesiredCount: 8
-      EnableECSManagedTags: true
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsSecurityGroup
-          Subnets:
-            - !Ref Ec2SubnetPublic1
-            - !Ref Ec2SubnetPublic2
-      PlatformVersion: 1.4.0
-      PropagateTags: TASK_DEFINITION
-      ServiceName: stream-loader
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ecs-service-stream-loader"
-      TaskDefinition: !Ref EcsTaskDefinitionStreamLoader
     Type: AWS::ECS::Service
 
 
@@ -2673,6 +2650,32 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-service-sshd"
       TaskDefinition: !Ref EcsTaskDefinitionSshd
+    Type: AWS::ECS::Service
+
+
+  EcsServiceStreamLoader:
+    DependsOn:
+     - LambdaRunnerInitSenzing
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 8
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      PropagateTags: TASK_DEFINITION
+      ServiceName: stream-loader
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-stream-loader"
+      TaskDefinition: !Ref EcsTaskDefinitionStreamLoader
     Type: AWS::ECS::Service
 
 
