@@ -27,7 +27,7 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Type:** String
 1. **Allowed pattern:** Letters and numbers. Specifically: `[a-zA-Z0-9]*`
 1. **Allowed values:** String of length 8 to 41 characters.
-1. **Example:**
+1. **Example:** dbPassword4Me
 1. **Default:** None
 
 ### DbUsername
@@ -37,34 +37,36 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Type:** String
 1. **Allowed pattern:** A letter followed by letters or numbers. Specifically: `[a-zA-Z][a-zA-Z0-9]*`
 1. **Allowed values:** String of length 1 to 16 characters.
+1. **Example:** user1234
 1. **Default:** senzing
 
 ### LogRetentionInDays
 
 1. **Synopsis:**
    The number of days to retain the log events.
-   For more information, see [AWS::Logs::LogGroup RetentionInDays](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html#cfn-logs-loggroup-retentionindays).
 1. **Required:** Yes
 1. **Type:** Number
 1. **Allowed values:** [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653 ]
 1. **Default:** 14
+1. **References:**
+    1. [AWS::Logs::LogGroup RetentionInDays](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html#cfn-logs-loggroup-retentionindays)
 
 ### RunSshd
 
 1. **Synopsis:**
    Optionally, run a container that allows `ssh` and `scp` access.
    Can be used for debugging, copying files to the EFS, or the Senzing Exploratory Tools.
-   More information at [github.com/Senzing/docker-sshd](https://github.com/Senzing/docker-sshd).
 1. **Required:** Yes
 1. **Type:** Boolean
 1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
+1. **References:**
+    1. [github.com/Senzing/docker-sshd](https://github.com/Senzing/docker-sshd)
 
 ### RunStreamProducer
 
 1. **Synopsis:**
    Optionally, run a container that fetches JSON lines from a file and pushes them to the SQS queue.
-   For more information, see [github.com/Senzing/stream-producer](https://github.com/Senzing/stream-producer).
    If "Yes" is chosen,
    [SenzingInputUrl](#senzinginputurl),
    [SenzingRecordMin](#senzingrecordmin),
@@ -75,27 +77,31 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Type:** Boolean
 1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
+1. **References:**
+    1. [github.com/Senzing/stream-producer](https://github.com/Senzing/stream-producer)
 
 ### RunSwagger
 
 1. **Synopsis:**
    Optionally, run a container that hosts the SwaggerUI for viewing the Senzing REST API OpenAPI document.
-   For more information, see [github.com/Senzing/senzing-rest-api-specification](https://github.com/Senzing/senzing-rest-api-specification).
 1. **Required:** Yes
 1. **Type:** Boolean
 1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Default:** No
+1. **References:**
+    1. [github.com/Senzing/senzing-rest-api-specification](https://github.com/Senzing/senzing-rest-api-specification).
 
 ### RunWebApp
 
 1. **Synopsis:**
    Optionally, run a container that hosts the Senzing Entity Search Web App.
-   For more information, see [github.com/Senzing/entity-search-web-app](https://github.com/Senzing/entity-search-web-app).
 1. **Required:** Yes
 1. **Type:** Boolean
 1. **Allowed values:**  [ "Yes" | "No" ]
 1. **Example:**
 1. **Default:** Yes
+1. **References:**
+    1. [github.com/Senzing/entity-search-web-app](https://github.com/Senzing/entity-search-web-app)
 
 ### SenzingInputUrl
 
@@ -136,7 +142,7 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Type:** Number
 1. **Allowed pattern:** Numbers. Specifically: `[0-9]*`
 1. **Allowed values:** 0 = Read entire file;  Any positive integer.
-1. **Example:*
+1. **Example:** 15000000
 1. **Default:** 100000 - The largest number before a Senzing license is needed.
 
 ### SenzingRecordMin
@@ -144,29 +150,30 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Synopsis:**
    When using [SenzingInputUrl](#senzinginputurl), this indicates the number of the first line that will be
    read from the file.
-   It is used to skip lines at the beginning of the file.
+   Used to skip lines at the beginning of the file.
    It is handy if the beginning of the file has already been ingested into Senzing.
 1. **Required:** Yes, if using [SenzingInputUrl](#senzinginputurl).  Otherwise, no.
 1. **Type:** Number
 1. **Allowed pattern:** Numbers. Specifically: `[0-9]*`
 1. **Allowed values:** 0 = Read from beginning;  Any positive integer.
-1. **Example:**
+1. **Example:** 100000
 1. **Default:** 0
 
 ### VpcAvailabilityZones
 
 1. **Synopsis:**
    When using [VpcId](#vpcid), list VPC availability zones in which to create subnets.
-   For list, see [Regions and Zones](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html)
-
+   Two availability zones need to be specified.
+   Anything after two will be ignored.
 1. **Required:** Yes, if using [VpcId](#vpcid).  Otherwise, no.
 1. **Type:** CommaDelimitedList
 1. **Allowed pattern:** Comma-delimited list of VPC availability zones in which to create subnets.
 1. **Example:** us-east-1a,us-east-1e
-1. **Default:** None - default availability zones used.
+1. **Default:** None - default availability zones used based on
+   [Fn::GetAZs](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getavailabilityzones.html) and
+   [AWS::Region](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html#cfn-pseudo-param-region)
 1. **References:**
-    1. [Fn::GetAZs](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getavailabilityzones.html)
-    1. [AWS::Region](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html#cfn-pseudo-param-region)
+    1. [Regions and Zones](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html)
 
 ### VpcId
 
@@ -175,6 +182,6 @@ Technical information on AWS Cloudformation parameters can be seen at
    If not specified, a new VPC will be created.
 1. **Required:** No
 1. **Type:** String
-1. **Allowed pattern:** `vpc-` followed by id. Specifically `^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$`
+1. **Allowed pattern:** `vpc-` followed by unique id. Specifically `^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$`
 1. **Example:** vpc-0a1b2c3d4e5f6g7h8
 1. **Default:** None - a new VPC will be created
