@@ -110,7 +110,7 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Required:** Yes if running Stream Producer, otherwise no.
 1. **Type:** String
 1. **Allowed pattern:**  A URL starting with `http://` or `https://`.
-1. **Example:**
+1. **Example:** `https://www.example.com/my/records.json.gz`
 1. **Default:** `https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz`
 
 ### SenzingLicenseAsBase64
@@ -118,7 +118,7 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Synopsis:**
    To ingest more than 100,000 records, a Senzing license is required.
    A binary version of the Senzing license, `g2.lic`, is not usable as a parameter in the text entry field.
-   A [Base64](https://en.wikipedia.org/wiki/Base64) representation of the information is needed.
+   Instead, a [Base64](https://en.wikipedia.org/wiki/Base64) representation of the information is needed.
    An example of how to produce base64 from `g2.lic` on Linux and macOS:
 
    ```console
@@ -126,11 +126,35 @@ Technical information on AWS Cloudformation parameters can be seen at
    ```
 
    Copy the entire output from the command and paste into the text entry field.
-1. **Required:** Only if ingesting more than 100,000 records.
+1. **Required:** Yes if ingesting more than 100,000 records, otherwise no.
 1. **Type:** String
-1. **Allowed pattern:** Base64 characters. Specifically `[^-A-Za-z0-9+/=]|=[^=]|={3,}$`
+1. **Allowed pattern:** Empty or Base64 characters. Specifically `^$|[^-A-Za-z0-9+/=]|=[^=]|={3,}$`
 1. **Allowed values:** Base64 encoded string
 1. **Example:**
+
+   ```console
+   AQAAADgCAAAAAAAAU2VuemluZwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARGVtbyBFeHBpcmVkAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjAtMTItMTYA
+   AAAAAAAAAAAARVZBTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAFNUQU5EQVJEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKCGAQAAAAAAMTk3Ni0wMS0wMQAAAAAAAAAAAABN
+   T05USExZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   AAAAAAAARkdIST5XYOZ90kbyAbU7wM7XvPCwq/FgORZIekwFMg8zi3tCD0V5+12q72aqk0E6JOct
+   +cPAq/T50N5Pf5nvJZ6TaW3TzQbnH/z5f/ALsWLydE2DPNvq3HuAjkjZpg2h7mb4OUqorGxDI9RX
+   TX8hPjzYrBfMdOgl1DlRBVG36WwdpB8AnSfaegbYU+U/vfof+ff6mJk8gzPg+OGPwg21/S6i2TT4
+   RbTCSYP/TpfXyJGE6dbQWEC9rFhYuWq3mFF3z7zFEcmxpNfZuBtYsxni8P3sDZ706RA+wcQF7TVg
+   giJoK03W8kd6mk3X+fvc4ARJo9RarYInsAvSHKlr1KpxeebuirfqgSz+uEW6pqOD1fV0oHnFncdf
+   jV2k2CqmIfThB/ONQcn/4/EIlhdzXqxSlXAGz6C7ApHq6xUCdLILx/NfdUEypHIfyabrpXKOKOPx
+   zekhGztEzB0gSJNebEa++EKxHDOc1Sc0YD9q9KvcaGSPTjlCJeaNhufg9Sz/iXZMP+d4Vkp+Bn6p
+   mfUPG7tKharEoRChUNfRms8wVyNxmz6LRw5Uy14Dlodd0LyBQRB9Tx8FVYMh5AElwjbQOoDOIRvi
+   IQIGsUNp/ZkP7PdBxc/b9o3rjUsZCzyCtP+jflZSqMenzXCsTI1Xay6On2wSVwQdJ1/2eIwKEfCF
+   hj4DZlY5+jSo
+   ```
+
 1. **Default:** None
 
 ### SenzingRecordMax
@@ -139,7 +163,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    When using [SenzingInputUrl](#senzinginputurl), this indicates the number of the last line that will be
    read from the file.
    It is used to limit the number of records ingested into Senzing.
-1. **Required:** Yes, if using [SenzingInputUrl](#senzinginputurl).  Otherwise, no.
+1. **Required:** Yes if using [SenzingInputUrl](#senzinginputurl), otherwise no.
 1. **Type:** Number
 1. **Allowed pattern:** Numbers. Specifically: `[0-9]*`
 1. **Allowed values:** 0 = Read entire file;  Any positive integer.
@@ -153,7 +177,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    read from the file.
    Used to skip lines at the beginning of the file.
    It is handy if the beginning of the file has already been ingested into Senzing.
-1. **Required:** Yes, if using [SenzingInputUrl](#senzinginputurl).  Otherwise, no.
+1. **Required:** Yes if using [SenzingInputUrl](#senzinginputurl), otherwise no.
 1. **Type:** Number
 1. **Allowed pattern:** Numbers. Specifically: `[0-9]*`
 1. **Allowed values:** 0 = Read from beginning;  Any positive integer.
@@ -166,7 +190,7 @@ Technical information on AWS Cloudformation parameters can be seen at
    When using [VpcId](#vpcid), list VPC availability zones in which to create subnets.
    Two availability zones need to be specified.
    Anything after two will be ignored.
-1. **Required:** Yes, if using [VpcId](#vpcid).  Otherwise, no.
+1. **Required:** Yes if using [VpcId](#vpcid), otherwise no.
 1. **Type:** CommaDelimitedList
 1. **Allowed pattern:** Comma-delimited list of VPC availability zones in which to create subnets.
 1. **Example:** us-east-1a,us-east-1e
@@ -184,5 +208,5 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Required:** No
 1. **Type:** String
 1. **Allowed pattern:** `vpc-` followed by unique id. Specifically `^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$`
-1. **Example:** vpc-0a1b2c3d4e5f6g7h8
+1. **Example:** vpc-1a2b3c4d5e6f7g8h9
 1. **Default:** None - a new VPC will be created
