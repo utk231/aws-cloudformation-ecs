@@ -5,14 +5,19 @@ AWSTemplateFormatVersion: 2010-09-09
 #     Lint: https://github.com/aws-cloudformation/cfn-python-lint
 #     Nag: https://github.com/stelligent/cfn_nag
 
+# TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
 # TODO: Add Senzing database cluster
-# TODO: Serialization on EFS 'Available'
+# TODO: Cleanup "nag" errors and warnings
 # TODO: Test with existing VPC and Availablity Zones
-# TODO: CIDR variable for restricting access
+# TODO: In Rules, fix detection of empty strings
+# TODO: CIDR variable for restricting access in EcsSecurityGroup
 # TODO: Add Jupyter
-# TODO: Add X-term (be aware of stickiness required)
+# TODO: Add X-term (be aware of required stickiness)
 # TODO: Autoscale Entity Search Web App
 # TODO: User-supplied password for "senzing/sshd" (Needs support in GitHub project)
+# TODO: Fix "Case sensitivity in RdsDbSubnetGroup" https://console.aws.amazon.com/support/home#/case/?displayId=7725760511
+# TODO: Fix TimeoutAction https://console.aws.amazon.com/support/home#/case/?displayId=7705681311
+
 
 Description: >-
   Senzing formation for AWS FARGATE...
@@ -221,7 +226,6 @@ Parameters:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
 # -----------------------------------------------------------------------------
 
-# FIXME: Fix detection of empty strings.
 
 Rules:
   ConfirmDbPasswords:
@@ -346,23 +350,23 @@ Resources:
     Type: AWS::IAM::Role
 
 
-  IamRoleEcsTaskExecution:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
-    Type: AWS::IAM::Role
+# IamRoleEcsTaskExecution:
+#   Properties:
+#     AssumeRolePolicyDocument:
+#       Statement:
+#         -
+#           Action:
+#             - sts:AssumeRole
+#           Effect: Allow
+#           Principal:
+#             Service:
+#               - ecs-tasks.amazonaws.com
+#       Version: '2012-10-17'
+#     Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+#   Type: AWS::IAM::Role
 
 
   IamRoleInitEfs:
@@ -579,52 +583,14 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
 
-  IamPolicyEcsTaskExecution:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
-      PolicyDocument:
-        Statement:
-          -
-            Effect: "Allow"
-            Action:
-              - ecr:GetAuthorizationToken
-              - ecr:BatchCheckLayerAvailability
-              - ecr:GetDownloadUrlForLayer
-              - ecr:BatchGetImage
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource: "*"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleEcsTaskExecution
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyEcsTaskExecutionPassRole:
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - iam:PassRole
-            Effect: Allow
-            Resource:
-              - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
-        Version: "2012-10-17"
-      Roles:
-       - !Ref IamRoleEcsTaskExecution
-    Type: AWS::IAM::Policy
-
-
-  IamPolicyLambda:
+  IamPolicyEfs:
     Properties:
       PolicyName: !Sub ${AWS::StackName}-iam-policy-lambda
       PolicyDocument:
         Statement:
           -
             Action:
-              - iam:PassRole
+              - elasticfilesystem:DescribeMountTargets
             Effect: Allow
             Resource:
               - "*"
@@ -632,6 +598,44 @@ Resources:
       Roles:
        - !Ref IamRoleLambda
     Type: AWS::IAM::Policy
+
+
+# IamPolicyEcsTaskExecution:
+#   Properties:
+#     PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
+#     PolicyDocument:
+#       Statement:
+#         -
+#           Effect: "Allow"
+#           Action:
+#             - ecr:GetAuthorizationToken
+#             - ecr:BatchCheckLayerAvailability
+#             - ecr:GetDownloadUrlForLayer
+#             - ecr:BatchGetImage
+#             - logs:CreateLogStream
+#             - logs:PutLogEvents
+#           Resource: "*"
+#       Version: "2012-10-17"
+#     Roles:
+#      - !Ref IamRoleEcsTaskExecution
+#   Type: AWS::IAM::Policy
+
+
+# IamPolicyEcsTaskExecutionPassRole:
+#   Properties:
+#     PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
+#     PolicyDocument:
+#       Statement:
+#         -
+#           Action:
+#             - iam:PassRole
+#           Effect: Allow
+#           Resource:
+#             - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
+#       Version: "2012-10-17"
+#     Roles:
+#      - !Ref IamRoleEcsTaskExecution
+#   Type: AWS::IAM::Policy
 
 
   IamPolicyLoggingCreateStream:
@@ -660,6 +664,25 @@ Resources:
        - !Ref IamRoleStreamProducer
        - !Ref IamRoleSwagger
        - !Ref IamRoleWebApp
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyPassRole:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-pass-role
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleLambda
+       - !Ref IamRoleStreamProducer
     Type: AWS::IAM::Policy
 
 
@@ -731,24 +754,29 @@ Resources:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
     Type: AWS::Logs::LogGroup
 
-  LogsLogGroupLambdaRun:
+  LogsLogGroupLambdaRunTask:
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run"
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-task"
     Type: "AWS::Logs::LogGroup"
 
-  LogsLogGroupLambdaRunAndWait:
+  LogsLogGroupLambdaRunTaskAndWait:
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-and-wait"
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-task-and-wait"
     Type: "AWS::Logs::LogGroup"
 
-  LogsLogGroupLambdaSleep:
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-sleep"
-    Type: "AWS::Logs::LogGroup"
+# LogsLogGroupLambdaSleep:
+#   Properties:
+#     LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-sleep"
+#   Type: "AWS::Logs::LogGroup"
 
   LogsLogGroupDbCluster:
     Properties:
       LogGroupName: !Sub "/aws/rds/cluster/${AWS::StackName}-aurora-cluster/postgresql"
+    Type: "AWS::Logs::LogGroup"
+
+  LogsLogGroupLambdaWaitForEfs:
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-wait-for-efs"
     Type: "AWS::Logs::LogGroup"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-flowlog.html
@@ -835,8 +863,6 @@ Resources:
     Type: AWS::EC2::Subnet
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
-
-# FIXME: Using parameters, tighten the CIDR values.
 
   EcsSecurityGroup:
     Properties:
@@ -1019,8 +1045,7 @@ Resources:
         Ref: Ec2SubnetPublic2
     Type: AWS::EFS::MountTarget
 
-# FIXME: Create resource(s) that guarantee EFS is "available"
-#       https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
+
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-accesspoint.html
 
@@ -1152,82 +1177,83 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
-  LambdaFunctionDebug:
-    Properties:
-      Code:
-        ZipFile: |
-          #!/usr/bin/env python3
+# LambdaFunctionDebug:
+#   Properties:
+#     Code:
+#       ZipFile: |
+#         #!/usr/bin/env python3
+#
+#         import cfnresponse
+#         import json
+#         import logging
+#         import traceback
+#
+#         logger = logging.getLogger()
+#         logger.setLevel(logging.INFO)
+#
+#         def handler(event, context):
+#           try:
+#             logger.info("Event: {0}".format(json.dumps(event)))
+#           except Exception as e:
+#             logger.error(e)
+#             traceback.print_exc()
+#           finally:
+#             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+#     Description: Logs the event object
+#     FunctionName: !Sub "${AWS::StackName}-lambda-debug"
+#     Handler: index.handler
+#     Role: !GetAtt IamRoleLambda.Arn
+#     Runtime: python3.8
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-lambda-debug"
+#     Timeout: 2
+#   Type: AWS::Lambda::Function
 
-          import cfnresponse
-          import json
-          import logging
-          import traceback
 
-          logger = logging.getLogger()
-          logger.setLevel(logging.INFO)
+# LambdaFunctionSleeper:
+#   Properties:
+#     Code:
+#       ZipFile: |
+#         #!/usr/bin/env python3
+#
+#         import cfnresponse
+#         import json
+#         import logging
+#         import time
+#         import traceback
+#
+#         logger = logging.getLogger()
+#         logger.setLevel(logging.INFO)
+#
+#         def handler(event, context):
+#             result = cfnresponse.SUCCESS
+#             try:
+#                 logger.info("Event: {0}".format(json.dumps(event)))
+#                 if event['RequestType'] in ['Create', 'Update']:
+#                     properties = event.get('ResourceProperties', {})
+#                     sleep_time_in_seconds = int(properties.get('SleepTimeInSeconds', 0))
+#                     logger.info("Sleeping {0} seconds.".format(sleep_time_in_seconds))
+#                     time.sleep(sleep_time_in_seconds)
+#                     logger.info("Awake.")
+#             except Exception as e:
+#                 logger.error(e)
+#                 traceback.print_exc()
+#                 result = cfnresponse.FAILED
+#             finally:
+#                 cfnresponse.send(event, context, result, {})
+#
+#     Description: Sleeps for a period of time
+#     FunctionName: !Sub "${AWS::StackName}-lambda-sleep"
+#     Handler: index.handler
+#     Role: !GetAtt IamRoleLambda.Arn
+#     Runtime: python3.8
+#     Tags:
+#       - Key: Name
+#         Value: !Sub "${AWS::StackName}-lambda-sleep"
+#     Timeout: 600
+#   Type: AWS::Lambda::Function
 
-          def handler(event, context):
-            try:
-              logger.info("Event: {0}".format(json.dumps(event)))
-            except Exception as e:
-              logger.error(e)
-              traceback.print_exc()
-            finally:
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-      Description: Logs the event object
-      FunctionName: !Sub "${AWS::StackName}-lambda-debug"
-      Handler: index.handler
-      Role: !GetAtt IamRoleLambda.Arn
-      Runtime: python3.8
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-debug"
-      Timeout: 2
-    Type: AWS::Lambda::Function
-
-
-  LambdaFunctionSleeper:
-    Properties:
-      Code:
-        ZipFile: |
-          #!/usr/bin/env python3
-
-          import cfnresponse
-          import json
-          import logging
-          import time
-          import traceback
-
-          logger = logging.getLogger()
-          logger.setLevel(logging.INFO)
-
-          def handler(event, context):
-              result = cfnresponse.SUCCESS
-              try:
-                  logger.info("Event: {0}".format(json.dumps(event)))
-                  if event['RequestType'] in ['Create', 'Update']:
-                      properties = event.get('ResourceProperties', {})
-                      sleep_time_in_seconds = int(properties.get('SleepTimeInSeconds', 0))
-                      logger.info("Sleeping {0} seconds.".format(sleep_time_in_seconds))
-                      time.sleep(sleep_time_in_seconds)
-                      logger.info("Awake.")
-              except Exception as e:
-                  logger.error(e)
-                  traceback.print_exc()
-                  result = cfnresponse.FAILED
-              finally:
-                  cfnresponse.send(event, context, result, {})
-
-      Description: Sleeps for a period of time
-      FunctionName: !Sub "${AWS::StackName}-lambda-sleep"
-      Handler: index.handler
-      Role: !GetAtt IamRoleLambda.Arn
-      Runtime: python3.8
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-sleep"
-      Timeout: 600
-    Type: AWS::Lambda::Function
 
 # LambdaFunctionInitEfs:
 #   Type: AWS::Lambda::Function
@@ -1340,13 +1366,13 @@ Resources:
                   cfnresponse.send(event, context, result, {})
 
       Description: Runs an ECS task
-      FunctionName: !Sub "${AWS::StackName}-lambda-run"
+      FunctionName: !Sub "${AWS::StackName}-lambda-run-task"
       Handler: index.handler
       Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-run"
+          Value: !Sub "${AWS::StackName}-lambda-run-task"
       Timeout: 30
     Type: AWS::Lambda::Function
 
@@ -1425,13 +1451,66 @@ Resources:
                   cfnresponse.send(event, context, result, {})
 
       Description: Runs an ECS task and waits until completion
-      FunctionName: !Sub "${AWS::StackName}-lambda-run-and-wait"
+      FunctionName: !Sub "${AWS::StackName}-lambda-run-task-and-wait"
       Handler: index.handler
       Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-run-and-wait"
+          Value: !Sub "${AWS::StackName}-lambda-run-task-and-wait"
+      Timeout: 600
+    Type: AWS::Lambda::Function
+
+
+  LambdaFunctionWaitForEfs:
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import cfnresponse
+          import json
+          import logging
+          import time
+          import traceback
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      describe_mount_targets_parameters = properties.get('DescribeMountTargetsParameters', {})
+                      efs = boto3.client('efs')
+                      done = False
+                      while not done:
+                          time.sleep(1)
+                          response = efs.describe_mount_targets(**describe_mount_targets_parameters)
+                          life_cycle_state = response.get("MountTargets",[{}])[0].get("LifeCycleState")
+                          logger.info("response = {0}".format(json.dumps(response)))
+                          logger.info("life_cycle_state = {0}".format(life_cycle_state))
+                          if 'available' == life_cycle_state:
+                              done = True
+                      logger.info("Done")
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, {})
+
+      Description: Waits until EFS MountTargets are available.
+      FunctionName: !Sub "${AWS::StackName}-lambda-wait-for-efs"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-wait-for-efs"
       Timeout: 600
     Type: AWS::Lambda::Function
 
@@ -1439,19 +1518,19 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-waitconditionhandle.html
 
-# WaitConditionHandle:
+# WaitConditionHandleEfs:
 #   Type: AWS::CloudFormation::WaitConditionHandle
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-waitcondition.html
 
 # WaitConditionEfs:
-#   Type: AWS::CloudFormation::WaitCondition
 #   DependsOn:
 #     - EfsMountTarget1
 #     - EfsMountTarget2
 #   Properties:
 #     Handle: !Ref WaitConditionHandle
 #     Timeout: 600
+#   Type: AWS::CloudFormation::WaitCondition
 
 # -- Run ECS tasks-------------------------------------------------------------
 
@@ -1468,11 +1547,11 @@ Resources:
 #   Type: Custom::LambdaRunnerDebug
 
 
-  LambdaRunnerSleeper:
-    Properties:
-      ServiceToken: !GetAtt LambdaFunctionSleeper.Arn
-      SleepTimeInSeconds: 180
-    Type: Custom::LambdaRunnerSleeper
+# LambdaRunnerSleeper:
+#   Properties:
+#     ServiceToken: !GetAtt LambdaFunctionSleeper.Arn
+#     SleepTimeInSeconds: 180
+#   Type: Custom::LambdaRunnerSleeper
 
 
 # LambdaRunnerInitEfs:
@@ -1486,10 +1565,8 @@ Resources:
 
   LambdaRunnerInitEfs:
     DependsOn:
-     - EfsFileSystem
-     - EfsMountTarget1
-     - EfsMountTarget2
-     - LambdaRunnerSleeper
+     - LambdaRunnerWaitForEfsMountTarget1
+     - LambdaRunnerWaitForEfsMountTarget2
     Properties:
       ClusterId: !Ref EcsCluster
       RunTaskParameters:
@@ -1599,10 +1676,8 @@ Resources:
   LambdaRunnerStreamProducer:
     Condition: IfRunStreamProducer
     DependsOn:
-     - EfsFileSystem
-     - EfsMountTarget1
-     - EfsMountTarget2
-     - LambdaRunnerSleeper
+     - LambdaRunnerWaitForEfsMountTarget1
+     - LambdaRunnerWaitForEfsMountTarget2
      - SqsQueue
     Properties:
       ClusterId: !Ref EcsCluster
@@ -1626,6 +1701,24 @@ Resources:
         taskDefinition: !Ref EcsTaskDefinitionStreamProducer
       ServiceToken: !GetAtt LambdaFunctionRunTask.Arn
     Type: Custom::LambdaRunnerStreamProducer
+
+
+  LambdaRunnerWaitForEfsMountTarget1:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      DescribeMountTargetsParameters:
+        MountTargetId: !Ref EfsMountTarget1
+      ServiceToken: !GetAtt LambdaFunctionWaitForEfs.Arn
+    Type: Custom::LambdaRunnerWaitForEfsMountTarget1
+
+
+  LambdaRunnerWaitForEfsMountTarget2:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      DescribeMountTargetsParameters:
+        MountTargetId: !Ref EfsMountTarget2
+      ServiceToken: !GetAtt LambdaFunctionWaitForEfs.Arn
+    Type: Custom::LambdaRunnerWaitForEfsMountTarget2
 
 # -- Load balancing -----------------------------------------------------------
 
@@ -2850,4 +2943,3 @@ Outputs:
     Condition: IfRunWebApp
     Description: Url for Senzing Web App
     Value: !Sub "http://${LoadBalancer.DNSName}:8251"
-

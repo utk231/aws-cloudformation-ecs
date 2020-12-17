@@ -2,6 +2,10 @@
 
 ## Abstract
 
+The `senzing-demo-full-stack` demonstration 
+
+
+
 Help for
 [senzing-demo-full-stack](https://github.com/Senzing/aws-cloudformation-ecs/tree/main/cloudformation/senzing-demo-full-stack).
 
@@ -39,17 +43,6 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Allowed values:** String of length 1 to 16 characters.
 1. **Example:** user1234
 1. **Default:** senzing
-
-### LogRetentionInDays
-
-1. **Synopsis:**
-   The number of days to retain the log events.
-1. **Required:** Yes
-1. **Type:** Number
-1. **Allowed values:** [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653 ]
-1. **Default:** 14
-1. **References:**
-    1. [AWS::Logs::LogGroup RetentionInDays](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html#cfn-logs-loggroup-retentionindays)
 
 ### RunSshd
 
