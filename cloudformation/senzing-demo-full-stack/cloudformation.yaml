@@ -11,6 +11,7 @@ AWSTemplateFormatVersion: 2010-09-09
 # TODO: Test with existing VPC and Availablity Zones
 # TODO: In Rules, fix detection of empty strings
 # TODO: CIDR variable for restricting access in EcsSecurityGroup
+# TODO: Improve EcsSecurityGroup so it's not a monolith
 # TODO: Add Jupyter
 # TODO: Add X-term (be aware of required stickiness)
 # TODO: Autoscale Entity Search Web App
@@ -45,6 +46,11 @@ Metadata:
           - DbPasswordConfirm
       -
         Label:
+          default: "Security"
+        Parameters:
+          - CidrInbound
+      -
+        Label:
           default: "Optional: Identify existing resources"
         Parameters:
           - VpcId
@@ -65,12 +71,15 @@ Metadata:
           - RunSwagger
           - RunWebApp
 
+
     ParameterLabels:
       AcceptEula:
         default: >-
           Required: If you accept the Senzing End User License Agreements at
           https://senzing.com/end-user-license-agreement,
           enter 'I_ACCEPT_THE_SENZING_EULA'.
+      CidrInbound:
+        default: "Required: Allowed inbound connections using CIDR notation."
       DbPassword:
         default: "Required: Password for AWS Aurora PostgreSQL serverless database access."
       DbPasswordConfirm:
@@ -124,6 +133,13 @@ Parameters:
     ConstraintDescription: AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
     Default: ''
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#accepteula"
+    Type: String
+
+  CidrInbound:
+    AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
+    ConstraintDescription: Inbound CIDR must be in the format n.n.n.n/n
+    Default: 0.0.0.0/0
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#cidrinbound"
     Type: String
 
   DbPassword:
@@ -347,6 +363,25 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-debug"
+    Type: AWS::IAM::Role
+
+
+  IamRoleFlowLog:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - vpc-flow-logs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-flow-log"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-flow-log"
     Type: AWS::IAM::Role
 
 
@@ -593,10 +628,32 @@ Resources:
               - elasticfilesystem:DescribeMountTargets
             Effect: Allow
             Resource:
-              - "*"
+#             - "*"
+              - !GetAtt EfsFileSystem.Arn
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyEc2FlowLogs:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-group
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleFlowLog
     Type: AWS::IAM::Policy
 
 
@@ -653,6 +710,7 @@ Resources:
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleApiServer
+       - !Ref IamRoleFlowLog
        - !Ref IamRoleInitEfs
        - !Ref IamRoleInitPostgres
        - !Ref IamRoleInitSenzing
@@ -680,6 +738,7 @@ Resources:
               - "*"
         Version: "2012-10-17"
       Roles:
+       - !Ref IamRoleFlowLog
        - !Ref IamRoleInitEfs
        - !Ref IamRoleLambda
        - !Ref IamRoleStreamProducer
@@ -721,7 +780,9 @@ Resources:
               - sqs:DeleteMessage
             Effect: Allow
             Resource:
-              - "*"
+              - !GetAtt SqsQueue.Arn
+              - !GetAtt SqsQueueDeadLetter.Arn
+#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamLoader
@@ -738,12 +799,13 @@ Resources:
               - sqs:SendMessage
             Effect: Allow
             Resource:
-              - "*"
+              - !GetAtt SqsQueue.Arn
+              - !GetAtt SqsQueueDeadLetter.Arn
+#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamProducer
     Type: AWS::IAM::Policy
-
 
 # -- Logging ------------------------------------------------------------------
 
@@ -780,18 +842,19 @@ Resources:
     Type: "AWS::Logs::LogGroup"
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-flowlog.html
+# https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-cwl.html
 
-# Ec2FlowLog:
-#   Type: AWS::EC2::FlowLog
-#   Properties:
-#     DeliverLogsPermissionArn: !GetAtt IamRoleLambda.Arn
-#     LogGroupName: !Ref LogsLogGroup
-#     ResourceId: !If
-#       - IfCreateVpcResources
-#       - !Ref Ec2Vpc
-#       - !Ref VpcId
-#     ResourceType: VPC
-#     TrafficType: ALL
+  Ec2FlowLog:
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt IamRoleFlowLog.Arn
+      LogGroupName: !Ref LogsLogGroupMain
+      ResourceId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+      ResourceType: VPC
+      TrafficType: ALL
+    Type: AWS::EC2::FlowLog
 
 # -- Cloud, subnets, routing --------------------------------------------------
 
