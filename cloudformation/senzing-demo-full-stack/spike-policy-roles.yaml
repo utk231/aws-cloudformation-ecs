@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+# Tests:
+#     Lint: https://github.com/aws-cloudformation/cfn-python-lint
+#     Nag: https://github.com/stelligent/cfn_nag
+
+Description: >-
+  Demonstrate IAM Roles and Policies.
+
+# -----------------------------------------------------------------------------
+# Resources
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+# -----------------------------------------------------------------------------
+
+Resources:
+
+# -- Iam -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleEcsTaskExecution:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-ecs-task-execution"
+    Type: AWS::IAM::Role
+
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+  IamPolicyEcsTaskExecution:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyEcsTaskExecutionPassRole:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-ecs-task-execution-pass-role
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
+        Version: "2012-10-17"
+#     Roles:
+#      - !GetAtt IamRoleEcsTaskExecution.Arn
+#     Roles:
+#      - !Sub "arn:aws:iam::${AWS::AccountId}:role/IamRoleEcsTaskExecution"
+      Roles:
+       - !Ref IamRoleEcsTaskExecution
+    Type: AWS::IAM::Policy
+
+# -----------------------------------------------------------------------------
+# Outputs
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  IamPolicyEcsTaskExecutionRef:
+    Description: Ref of IamRoleEcsTaskExecution
+    Value: !Ref IamPolicyEcsTaskExecution
+
+  IamPolicyEcsTaskExecution:
+    Description: ARN of IamRoleEcsTaskExecution
+    Value: IamPolicyEcsTaskExecution
+
+  IamRoleEcsTaskExecution:
+    Description: ARN of IamRoleEcsTaskExecution
+    Value: !GetAtt IamRoleEcsTaskExecution.Arn
