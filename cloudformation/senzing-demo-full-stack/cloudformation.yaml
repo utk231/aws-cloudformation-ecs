@@ -6,6 +6,7 @@ AWSTemplateFormatVersion: 2010-09-09
 #     Nag: https://github.com/stelligent/cfn_nag
 
 # TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
+# TODO: Fix Help URLs.
 # TODO: Add Senzing database cluster
 # TODO: Cleanup "nag" errors and warnings
 # TODO: Test with existing VPC and Availablity Zones
@@ -70,6 +71,7 @@ Metadata:
           - RunSshd
           - RunSwagger
           - RunWebApp
+          - RunVpcFlowLogs
 
 
     ParameterLabels:
@@ -92,6 +94,8 @@ Metadata:
         default: "Optional: Would you like to run stream-producer job?"
       RunSwagger:
         default: "Optional: Would you like to run Swagger service?"
+      RunVpcFlowLogs:
+        default: "Optional: Would you like to enable AWS VPC Flow Logs?"
       RunWebApp:
         default: "Optional: Would you like to run the Senzing WebApp service?"
       SenzingInputUrl:
@@ -191,6 +195,14 @@ Parameters:
       - "Yes"
     Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
+    Type: String
+
+  RunVpcFlowLogs:
+    AllowedValues:
+      - "No"
+      - "Yes"
+    Default: "No"
+    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runvpcflowlogs"
     Type: String
 
   RunWebApp:
@@ -304,6 +316,10 @@ Conditions:
 
   IfRunSwagger: !Equals
     - !Ref RunSwagger
+    - "Yes"
+
+  IfRunVpcFlowLogs: !Equals
+    - !Ref RunVpcFlowLogs
     - "Yes"
 
   IfRunWebApp: !Equals
@@ -845,6 +861,7 @@ Resources:
 # https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-cwl.html
 
   Ec2FlowLog:
+    Condition: IfRunVpcFlowLogs
     Properties:
       DeliverLogsPermissionArn: !GetAtt IamRoleFlowLog.Arn
       LogGroupName: !Ref LogsLogGroupMain
@@ -927,7 +944,7 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
-  EcsSecurityGroup:
+  EcsSecurityGroupInternal:
     Properties:
       GroupDescription: ECS Allowed Ports
 #     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
@@ -1005,7 +1022,68 @@ Resources:
           ToPort: 9171
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-security-group"
+          Value: !Sub "${AWS::StackName}-ec2-security-group-internal"
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+    Type: AWS::EC2::SecurityGroup
+
+
+  EcsSecurityGroupLoadBalancer:
+    Properties:
+      GroupDescription: Ports open to load balancer.
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+#       -
+#         CidrIp: !Ref CidrInbound
+#         Description: HTTP
+#         FromPort: 80
+#         IpProtocol: tcp
+#         ToPort: 80
+#       -
+#         CidrIp: !Ref CidrInbound
+#         Description: HTTPS
+#         FromPort: 443
+#         IpProtocol: tcp
+#         ToPort: 443
+#       -
+#         CidrIp: !Ref CidrInbound
+#         Description: Senzing X-Term
+#         FromPort: 5000
+#         IpProtocol: tcp
+#         ToPort: 5000
+        -
+          CidrIp: !Ref CidrInbound
+          Description: Senzing API server
+          FromPort: 8250
+          IpProtocol: tcp
+          ToPort: 8250
+        -
+          CidrIp: !Ref CidrInbound
+          Description: Senzing Web App
+          FromPort: 8251
+          IpProtocol: tcp
+          ToPort: 8251
+        -
+          CidrIp: !Ref CidrInbound
+          Description: Swagger UI
+          FromPort: 8080
+          IpProtocol: tcp
+          ToPort: 8080
+#       -
+#         CidrIp: !Ref CidrInbound
+#         Description: Senzing Jupyter notebooks
+#         FromPort: 8888
+#         IpProtocol: tcp
+#         ToPort: 8888
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-load-balancer"
       VpcId: !If
         - IfCreateVpcResources
         - !Ref Ec2Vpc
@@ -1092,7 +1170,7 @@ Resources:
       FileSystemId:
         Ref: EfsFileSystem
       SecurityGroups:
-        - Ref: EcsSecurityGroup
+        - Ref: EcsSecurityGroupInternal
       SubnetId:
         Ref: Ec2SubnetPublic1
     Type: AWS::EFS::MountTarget
@@ -1103,7 +1181,7 @@ Resources:
       FileSystemId:
         Ref: EfsFileSystem
       SecurityGroups:
-        - Ref: EcsSecurityGroup
+        - Ref: EcsSecurityGroupInternal
       SubnetId:
         Ref: Ec2SubnetPublic2
     Type: AWS::EFS::MountTarget
@@ -1186,7 +1264,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-rds-db-cluster"
       VpcSecurityGroupIds:
-        - !Ref EcsSecurityGroup
+        - !Ref EcsSecurityGroupInternal
     Type: AWS::RDS::DBCluster
 
 
@@ -1369,7 +1447,7 @@ Resources:
 #     Timeout: 300
 #     VpcConfig:
 #       SecurityGroupIds:
-#         - !Ref EcsSecurityGroup
+#         - !Ref EcsSecurityGroupInternal
 #       SubnetIds:
 #         - !Ref Ec2SubnetPublic1
 #         - !Ref Ec2SubnetPublic2
@@ -1641,7 +1719,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroup
+              - !Ref EcsSecurityGroupInternal
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1668,7 +1746,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroup
+              - !Ref EcsSecurityGroupInternal
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1696,7 +1774,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroup
+              - !Ref EcsSecurityGroupInternal
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1723,7 +1801,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroup
+              - !Ref EcsSecurityGroupInternal
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1753,7 +1831,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroup
+              - !Ref EcsSecurityGroupInternal
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1788,7 +1866,6 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
 
   LoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
 #     LoadBalancerAttributes:
 #       -
@@ -1803,11 +1880,16 @@ Resources:
 #     Name: !Sub "${AWS::StackName}-load-balancer"
       Scheme: internet-facing
       SecurityGroups:
-        - !Ref EcsSecurityGroup
+        - !Ref EcsSecurityGroupInternal
       Subnets:
         - !Ref Ec2SubnetPublic1
         - !Ref Ec2SubnetPublic2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-load-balancer"
       Type: application
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
 
@@ -1815,24 +1897,27 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !If
-        - IfCreateVpcResources
-        - !Ref Ec2Vpc
-        - !Ref VpcId
-      Port: 8250
-      Protocol: HTTP
-      Matcher:
-        HttpCode: 200-299
       HealthCheckIntervalSeconds: 80
       HealthCheckPath: "/heartbeat"
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 50
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-299
+      Port: 8250
+      Protocol: HTTP
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-target-group-api-server"
       TargetGroupAttributes:
-      - Key: deregistration_delay.timeout_seconds
-        Value: '60'
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
       TargetType: ip
+      UnhealthyThresholdCount: 5
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
 
 
@@ -1841,24 +1926,27 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !If
-        - IfCreateVpcResources
-        - !Ref Ec2Vpc
-        - !Ref VpcId
-      Port: 8080
-      Protocol: HTTP
-      Matcher:
-        HttpCode: 200-299
       HealthCheckIntervalSeconds: 80
       HealthCheckPath: "/"
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 50
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-299
+      Port: 8080
+      Protocol: HTTP
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-target-group-swagger"
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
         Value: '60'
       TargetType: ip
+      UnhealthyThresholdCount: 5
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
 
 
@@ -1867,24 +1955,27 @@ Resources:
     DependsOn:
      - LoadBalancer
     Properties:
-      VpcId: !If
-        - IfCreateVpcResources
-        - !Ref Ec2Vpc
-        - !Ref VpcId
-      Port: 8251
-      Protocol: HTTP
-      Matcher:
-        HttpCode: 200-299
       HealthCheckIntervalSeconds: 80
       HealthCheckPath: "/"
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 50
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-299
+      Port: 8251
+      Protocol: HTTP
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-target-group-web-app"
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
         Value: '60'
       TargetType: ip
+      UnhealthyThresholdCount: 5
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
@@ -2761,7 +2852,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
@@ -2786,7 +2877,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
@@ -2812,7 +2903,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
@@ -2837,7 +2928,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
@@ -2869,7 +2960,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2
@@ -2900,7 +2991,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref EcsSecurityGroup
+            - !Ref EcsSecurityGroupInternal
           Subnets:
             - !Ref Ec2SubnetPublic1
             - !Ref Ec2SubnetPublic2

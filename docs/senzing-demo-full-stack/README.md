@@ -1,13 +1,109 @@
-# Cloudformation:  senzing-demo-full-stack
+# Cloudformation: senzing-demo-full-stack
 
-## Abstract
+## Synopsis
 
-The `senzing-demo-full-stack` demonstration 
+The `senzing-demo-full-stack` demonstrates a Senzing deployment using an AWS Cloudformation template.
 
+## Overview
 
+The `senzing-demo-full-stack` demonstration is an AWS Cloudformation template that creates the following resources:
+
+1. AWS infrastructure
+    1. VPC
+    1. Subnets
+    1. Internet Gateway
+    1. Routes
+    1. IAM Roles and Policies
+    1. Logging
+1. AWS services
+    1. AWS Elastic File System (EFS)
+    1. AWS Simple Queue Service (SQS)
+    1. AWS Relational Data Service (RDS) Aurora Postgres Serverless
+    1. AWS Elastic Container Service (ECS) Fargate
+1. Senzing services
+    1. Senzing Stream-Loader
+    1. Senzing Redoer
+    1. Senzing API server
+    1. Senzing Entity Search Web App
+1. Optional services:
+    1. SwaggerUI
+    1. Senzing Stream-producer
+    1. Senzing SSH access
+    1. AWS VPC Flow Logs
+
+The following diagram shows the relationship of the docker containers in this docker composition.
+Arrows represent data flow.
+
+![Image of architecture](architecture.png)
+
+This docker formation brings up the following docker containers:
+
+1. *[senzing/entity-web-search-app](https://github.com/Senzing/entity-search-web-app)*
+1. *[senzing/redoer](https://github.com/Senzing/redoer)*
+1. *[senzing/senzing-api-server](https://github.com/Senzing/senzing-api-server)*
+1. *[senzing/sshd](https://github.com/Senzing/docker-sshd)*
+1. *[senzing/stream-loader](https://github.com/Senzing/stream-loader)*
+1. *[senzing/stream-producer](https://github.com/Senzing/stream-producer)*
 
 Help for
 [senzing-demo-full-stack](https://github.com/Senzing/aws-cloudformation-ecs/tree/main/cloudformation/senzing-demo-full-stack).
+
+### Contents
+
+1. [Preamble](#preamble)
+    1. [Legend](#legend)
+1. [Expectations](#expectations)
+1. [Demonstrate using AWS Console](#demonstrate-using-aws-console)
+1. [Parameters](#parameters)
+
+## Preamble
+
+At [Senzing](http://senzing.com),
+we strive to create GitHub documentation in a
+"[don't make me think](https://github.com/Senzing/knowledge-base/blob/master/WHATIS/dont-make-me-think.md)" style.
+For the most part, instructions are copy and paste.
+Whenever thinking is needed, it's marked with a "thinking" icon :thinking:.
+Whenever customization is needed, it's marked with a "pencil" icon :pencil2:.
+If the instructions are not clear, please let us know by opening a new
+[Documentation issue](https://github.com/Senzing/aws-cloudformation-ecs/issues/new?template=documentation_request.md)
+describing where we can improve.   Now on with the show...
+
+### Legend
+
+1. :thinking: - A "thinker" icon means that a little extra thinking may be required.
+   Perhaps there are some choices to be made.
+   Perhaps it's an optional step.
+1. :pencil2: - A "pencil" icon means that the instructions may need modification before performing.
+1. :warning: - A "warning" icon means that something tricky is happening, so pay attention.
+
+## Expectations
+
+- **Space:** This repository and demonstration require 6 GB free disk space.
+- **Time:** Budget 40 minutes to get the demonstration up-and-running.
+- **Background knowledge:** This repository assumes a working knowledge of:
+  - [AWS Cloudformation](https://github.com/Senzing/knowledge-base/blob/master/WHATIS/aws-cloudformation.md)
+
+## Demonstrate using AWS Console
+
+### FIXME:
+
+1. Visit the [AWS Cloudformation console](https://console.aws.amazon.com/cloudformation/home)
+1. In the upper right, click the "Create stack" dropdown button.
+1. Click on "With new resources (standard)" list item.
+
+
+1. Click on [this](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3-us-west-1.amazonaws.com/cf-templates-xoqvergspzx7-us-west-1/2020345u3s-cloudformation.yaml)
+1. In lower-right, click on "Next" button.
+1. In "Specify stack details"
+    1. **Stack name** A identifier of your choosing.  Example: "senzing-demo"
+    1. In "Parameters"
+        1. In "Senzing installation"
+            1. Accept the End User Licence Agreement
+        1. In "Database"
+            1. Enter database password
+            1. Confirm database password
+    1. In lower-right, click "Next" button.
+
 
 ## Parameters
 
@@ -24,6 +120,16 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Allowed values:** See [SENZING_ACCEPT_EULA](https://github.com/Senzing/knowledge-base/blob/master/lists/environment-variables.md#senzing_accept_eula).
 1. **Default:** None
 
+### CidrInbound
+
+1. **Synopsis:** The password used to access the AWS Aurora Postgres Serverless databases.
+1. **Required:** Yes
+1. **Type:** String
+1. **Allowed pattern:** Letters and numbers. Specifically: `'(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'`
+1. **Allowed values:** String in IPv4 [CIDR format](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
+1. **Example:** 45.26.129.200/32
+1. **Default:** 0.0.0.0/0
+
 ### DbPassword
 
 1. **Synopsis:** The password used to access the AWS Aurora Postgres Serverless databases.
@@ -32,6 +138,15 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Allowed pattern:** Letters and numbers. Specifically: `[a-zA-Z0-9]*`
 1. **Allowed values:** String of length 8 to 41 characters.
 1. **Example:** dbPassword4Me
+1. **Default:** None
+
+### DbPasswordConfirm
+
+1. **Synopsis:** A confirmation of the database password.
+1. **Required:** Yes
+1. **Type:** String
+1. **Allowed pattern:** Letters and numbers. Specifically: `[a-zA-Z0-9]*`
+1. **Allowed values:** Must match value of [DbPassword](#dbpassword)
 1. **Default:** None
 
 ### DbUsername
@@ -83,6 +198,17 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Default:** No
 1. **References:**
     1. [github.com/Senzing/senzing-rest-api-specification](https://github.com/Senzing/senzing-rest-api-specification).
+
+### RunVpcFlowLogs
+
+1. **Synopsis:**
+   Optionally, capture information about the IP traffic going to and from network interfaces in your VPC.
+1. **Required:** Yes
+1. **Type:** Boolean
+1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Default:** No
+1. **References:**
+    1. [VPC Flow Logs](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html).
 
 ### RunWebApp
 
