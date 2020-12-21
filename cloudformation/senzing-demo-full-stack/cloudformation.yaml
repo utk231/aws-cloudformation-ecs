@@ -177,7 +177,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
@@ -193,7 +193,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
@@ -209,7 +209,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "No"
+    Default: "Yes"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
     Type: String
 
@@ -253,7 +253,6 @@ Parameters:
 # Rules
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
 # -----------------------------------------------------------------------------
-
 
 Rules:
   ConfirmDbPasswords:
@@ -952,34 +951,9 @@ Resources:
           CidrIp: 0.0.0.0/0
           Description: All
           IpProtocol: "-1"
-      SecurityGroupIngress:
-        -
-          CidrIp: 0.0.0.0/0
-          Description: SSH
-          FromPort: 22
-          IpProtocol: tcp
-          ToPort: 22
-        -
-          CidrIp: 0.0.0.0/0
-          Description: HTTP
-          FromPort: 80
-          IpProtocol: tcp
-          ToPort: 80
-        -
-          CidrIp: 0.0.0.0/0
-          Description: HTTPS
-          FromPort: 443
-          IpProtocol: tcp
-          ToPort: 443
-        -
-          CidrIp: 0.0.0.0/0
-          Description: NFS
-          FromPort: 2049
-          IpProtocol: tcp
-          ToPort: 2049
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-security-group-apple"
+          Value: !Sub "${AWS::StackName}-ec2-security-group-lambda-runner"
       VpcId: !If
         - IfCreateVpcResources
         - !Ref Ec2Vpc
@@ -1958,7 +1932,7 @@ Resources:
 #     Name: !Sub "${AWS::StackName}-load-balancer"
       Scheme: internet-facing
       SecurityGroups:
-        - !Ref EcsSecurityGroupInternal
+        - !Ref EcsSecurityGroupLoadBalancer
       Subnets:
         - !Ref Ec2SubnetPublic1
         - !Ref Ec2SubnetPublic2
