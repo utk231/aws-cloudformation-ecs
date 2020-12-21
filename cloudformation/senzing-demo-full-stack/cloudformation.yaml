@@ -6,7 +6,7 @@ AWSTemplateFormatVersion: 2010-09-09
 #     Nag: https://github.com/stelligent/cfn_nag
 
 # TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
-# TODO: Fix Help URLs.
+# TODO: Fix Help URLs.  When hub.senzing.com is available.
 # TODO: Add Senzing database cluster
 # TODO: Cleanup "nag" errors and warnings
 # TODO: Test with existing VPC and Availablity Zones
@@ -177,7 +177,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
     Type: String
 
@@ -193,7 +193,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
     Type: String
 
@@ -209,7 +209,7 @@ Parameters:
     AllowedValues:
       - "No"
       - "Yes"
-    Default: "Yes"
+    Default: "No"
     Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
     Type: String
 
@@ -944,10 +944,9 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
-  EcsSecurityGroupInternal:
+  EcsSecurityGroupLambdaRunner:
     Properties:
       GroupDescription: ECS Allowed Ports
-#     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
       SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
@@ -978,44 +977,121 @@ Resources:
           FromPort: 2049
           IpProtocol: tcp
           ToPort: 2049
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-apple"
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+    Type: AWS::EC2::SecurityGroup
+
+
+  EcsSecurityGroupInternal:
+    Properties:
+      GroupDescription: ECS Allowed Ports
+#     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
+      SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: HTTP
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: HTTPS
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: NFS
+          FromPort: 2049
+          IpProtocol: tcp
+          ToPort: 2049
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing X-Term
           FromPort: 5000
           IpProtocol: tcp
           ToPort: 5000
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: PostgreSQL
           FromPort: 5432
           IpProtocol: tcp
           ToPort: 5432
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing API server
           FromPort: 8250
           IpProtocol: tcp
           ToPort: 8250
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing Web App
           FromPort: 8251
           IpProtocol: tcp
           ToPort: 8251
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Swagger UI
           FromPort: 8080
           IpProtocol: tcp
           ToPort: 8080
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing Jupyter notebooks
           FromPort: 8888
           IpProtocol: tcp
           ToPort: 8888
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: phpPgAdmin
           FromPort: 9171
           IpProtocol: tcp
@@ -1636,6 +1712,8 @@ Resources:
                           logger.info("life_cycle_state = {0}".format(life_cycle_state))
                           if 'available' == life_cycle_state:
                               done = True
+                      logger.info("sleeping 2 minutes")
+                      time.sleep(120)
                       logger.info("Done")
               except Exception as e:
                   logger.error(e)
@@ -1719,7 +1797,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1746,7 +1824,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1774,7 +1852,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1801,7 +1879,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1831,7 +1909,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
