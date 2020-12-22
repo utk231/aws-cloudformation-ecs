@@ -6,7 +6,7 @@ AWSTemplateFormatVersion: 2010-09-09
 #     Nag: https://github.com/stelligent/cfn_nag
 
 # TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
-# TODO: Fix Help URLs.
+# TODO: Fix Help URLs.  When hub.senzing.com is available.
 # TODO: Add Senzing database cluster
 # TODO: Cleanup "nag" errors and warnings
 # TODO: Test with existing VPC and Availablity Zones
@@ -20,9 +20,8 @@ AWSTemplateFormatVersion: 2010-09-09
 # TODO: Fix "Case sensitivity in RdsDbSubnetGroup" https://console.aws.amazon.com/support/home#/case/?displayId=7725760511
 # TODO: Fix TimeoutAction https://console.aws.amazon.com/support/home#/case/?displayId=7705681311
 
-
 Description: >-
-  Senzing formation for AWS FARGATE...
+  Senzing formation for AWS FARGATE. Version: 0.1.0
 
 # -----------------------------------------------------------------------------
 # Metadata
@@ -253,7 +252,6 @@ Parameters:
 # Rules
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
 # -----------------------------------------------------------------------------
-
 
 Rules:
   ConfirmDbPasswords:
@@ -644,7 +642,6 @@ Resources:
               - elasticfilesystem:DescribeMountTargets
             Effect: Allow
             Resource:
-#             - "*"
               - !GetAtt EfsFileSystem.Arn
         Version: "2012-10-17"
       Roles:
@@ -798,7 +795,6 @@ Resources:
             Resource:
               - !GetAtt SqsQueue.Arn
               - !GetAtt SqsQueueDeadLetter.Arn
-#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamLoader
@@ -817,7 +813,6 @@ Resources:
             Resource:
               - !GetAtt SqsQueue.Arn
               - !GetAtt SqsQueueDeadLetter.Arn
-#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamProducer
@@ -944,10 +939,27 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
 
+  EcsSecurityGroupLambdaRunner:
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-lambda-runner"
+      VpcId: !If
+        - IfCreateVpcResources
+        - !Ref Ec2Vpc
+        - !Ref VpcId
+    Type: AWS::EC2::SecurityGroup
+
+
   EcsSecurityGroupInternal:
     Properties:
       GroupDescription: ECS Allowed Ports
-#     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
       SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
@@ -955,67 +967,100 @@ Resources:
           IpProtocol: "-1"
       SecurityGroupIngress:
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: SSH
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: HTTP
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: HTTPS
           FromPort: 443
           IpProtocol: tcp
           ToPort: 443
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: NFS
           FromPort: 2049
           IpProtocol: tcp
           ToPort: 2049
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing X-Term
           FromPort: 5000
           IpProtocol: tcp
           ToPort: 5000
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: PostgreSQL
           FromPort: 5432
           IpProtocol: tcp
           ToPort: 5432
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing API server
           FromPort: 8250
           IpProtocol: tcp
           ToPort: 8250
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing Web App
           FromPort: 8251
           IpProtocol: tcp
           ToPort: 8251
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Swagger UI
           FromPort: 8080
           IpProtocol: tcp
           ToPort: 8080
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: Senzing Jupyter notebooks
           FromPort: 8888
           IpProtocol: tcp
           ToPort: 8888
         -
-          CidrIp: 0.0.0.0/0
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
           Description: phpPgAdmin
           FromPort: 9171
           IpProtocol: tcp
@@ -1186,8 +1231,6 @@ Resources:
         Ref: Ec2SubnetPublic2
     Type: AWS::EFS::MountTarget
 
-
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-accesspoint.html
 
 # EfsAccessPoint:
@@ -1266,7 +1309,6 @@ Resources:
       VpcSecurityGroupIds:
         - !Ref EcsSecurityGroupInternal
     Type: AWS::RDS::DBCluster
-
 
 # -- Queue --------------------------------------------------------------------
 
@@ -1452,6 +1494,7 @@ Resources:
 #         - !Ref Ec2SubnetPublic1
 #         - !Ref Ec2SubnetPublic2
 
+
   LambdaFunctionRunTask:
     Properties:
       Code:
@@ -1636,6 +1679,8 @@ Resources:
                           logger.info("life_cycle_state = {0}".format(life_cycle_state))
                           if 'available' == life_cycle_state:
                               done = True
+                      logger.info("sleeping 2 minutes")
+                      time.sleep(120)
                       logger.info("Done")
               except Exception as e:
                   logger.error(e)
@@ -1719,7 +1764,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1746,7 +1791,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1774,7 +1819,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1801,7 +1846,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1831,7 +1876,7 @@ Resources:
           awsvpcConfiguration:
             assignPublicIp: ENABLED
             securityGroups:
-              - !Ref EcsSecurityGroupInternal
+              - !Ref EcsSecurityGroupLambdaRunner
             subnets:
               - !Ref Ec2SubnetPublic1
               - !Ref Ec2SubnetPublic2
@@ -1880,7 +1925,7 @@ Resources:
 #     Name: !Sub "${AWS::StackName}-load-balancer"
       Scheme: internet-facing
       SecurityGroups:
-        - !Ref EcsSecurityGroupInternal
+        - !Ref EcsSecurityGroupLoadBalancer
       Subnets:
         - !Ref Ec2SubnetPublic1
         - !Ref Ec2SubnetPublic2
@@ -1889,7 +1934,6 @@ Resources:
           Value: !Sub "${AWS::StackName}-load-balancer"
       Type: application
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
 
@@ -2013,7 +2057,6 @@ Resources:
       Port: 8251
       Protocol: HTTP
     Type: AWS::ElasticLoadBalancingV2::Listener
-
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -3042,6 +3085,10 @@ Resources:
 # -----------------------------------------------------------------------------
 
 Outputs:
+
+  ADescriptionOfOutputs:
+    Description: Help for output values.
+    Value: "http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#outputs"
 
   ApiServerHeartbeatUrl:
     Description: Url for Swagger
