@@ -20,9 +20,8 @@ AWSTemplateFormatVersion: 2010-09-09
 # TODO: Fix "Case sensitivity in RdsDbSubnetGroup" https://console.aws.amazon.com/support/home#/case/?displayId=7725760511
 # TODO: Fix TimeoutAction https://console.aws.amazon.com/support/home#/case/?displayId=7705681311
 
-
 Description: >-
-  Senzing formation for AWS FARGATE...
+  Senzing formation for AWS FARGATE. Version: 0.1.0
 
 # -----------------------------------------------------------------------------
 # Metadata
@@ -643,7 +642,6 @@ Resources:
               - elasticfilesystem:DescribeMountTargets
             Effect: Allow
             Resource:
-#             - "*"
               - !GetAtt EfsFileSystem.Arn
         Version: "2012-10-17"
       Roles:
@@ -797,7 +795,6 @@ Resources:
             Resource:
               - !GetAtt SqsQueue.Arn
               - !GetAtt SqsQueueDeadLetter.Arn
-#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamLoader
@@ -816,7 +813,6 @@ Resources:
             Resource:
               - !GetAtt SqsQueue.Arn
               - !GetAtt SqsQueueDeadLetter.Arn
-#             - "*"
         Version: "2012-10-17"
       Roles:
        - !Ref IamRoleStreamProducer
@@ -964,7 +960,6 @@ Resources:
   EcsSecurityGroupInternal:
     Properties:
       GroupDescription: ECS Allowed Ports
-#     GroupName: !Sub "${AWS::StackName}-ec2-security-group"
       SecurityGroupEgress:
         -
           CidrIp: 0.0.0.0/0
@@ -1236,8 +1231,6 @@ Resources:
         Ref: Ec2SubnetPublic2
     Type: AWS::EFS::MountTarget
 
-
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-accesspoint.html
 
 # EfsAccessPoint:
@@ -1316,7 +1309,6 @@ Resources:
       VpcSecurityGroupIds:
         - !Ref EcsSecurityGroupInternal
     Type: AWS::RDS::DBCluster
-
 
 # -- Queue --------------------------------------------------------------------
 
@@ -1501,6 +1493,7 @@ Resources:
 #       SubnetIds:
 #         - !Ref Ec2SubnetPublic1
 #         - !Ref Ec2SubnetPublic2
+
 
   LambdaFunctionRunTask:
     Properties:
@@ -1942,7 +1935,6 @@ Resources:
       Type: application
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
 
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
 
   TargetGroupApiServer:
@@ -2065,7 +2057,6 @@ Resources:
       Port: 8251
       Protocol: HTTP
     Type: AWS::ElasticLoadBalancingV2::Listener
-
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -3094,6 +3085,10 @@ Resources:
 # -----------------------------------------------------------------------------
 
 Outputs:
+
+  ADescriptionOfOutputs:
+    Description: Help for output values.
+    Value: "http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#outputs"
 
   ApiServerHeartbeatUrl:
     Description: Url for Swagger

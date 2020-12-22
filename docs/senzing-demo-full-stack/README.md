@@ -55,6 +55,7 @@ Help for
 1. [Expectations](#expectations)
 1. [Demonstrate using AWS Console](#demonstrate-using-aws-console)
 1. [Parameters](#parameters)
+1. [Outputs](#outputs)
 
 ## Preamble
 
@@ -85,25 +86,37 @@ describing where we can improve.   Now on with the show...
 
 ## Demonstrate using AWS Console
 
-### FIXME:
+### Launch AWS Cloudformation
 
-1. Visit the [AWS Cloudformation console](https://console.aws.amazon.com/cloudformation/home)
-1. In the upper right, click the "Create stack" dropdown button.
-1. Click on "With new resources (standard)" list item.
-
-
-1. Click on [this](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3-us-west-1.amazonaws.com/cf-templates-xoqvergspzx7-us-west-1/2020345u3s-cloudformation.yaml)
+1. Visit [AWS Cloudformation with Senzing template](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3-us-west-1.amazonaws.com/cf-templates-xoqvergspzx7-us-west-1/2020357pXi-cloudformation.yaml).
 1. In lower-right, click on "Next" button.
-1. In "Specify stack details"
-    1. **Stack name** A identifier of your choosing.  Example: "senzing-demo"
-    1. In "Parameters"
-        1. In "Senzing installation"
+1. In **Specify stack details**
+    1. In **Stack name**
+        1. Enter an identifier of your choosing.
+           Example: "senzing-demo"
+    1. In **Parameters**
+        1. In **Senzing installation**
             1. Accept the End User Licence Agreement
-        1. In "Database"
-            1. Enter database password
-            1. Confirm database password
+        1. In **Database**
+            1. Enter a database password of your choosing.
+            1. Confirm database password by retyping the password.
+    1. Other parameters are optional.
     1. In lower-right, click "Next" button.
+1. In **Configure stack options**
+    1. In lower-right, click "Next" button.
+1. In **Review {stack-name}**
+    1. Near the bottom, in **Capabilities**
+        1. Check ":ballot_box_with_check: I acknowledge that AWS CloudFormation might create IAM resources."
+    1. In lower-right, click "Create stack" button.
+1. Senzing formation takes about 15 minutes to fully deploy.
 
+### View results
+
+1. Visit [AWS Cloudformation console](https://console.aws.amazon.com/cloudformation/home).
+1. Choose appropriate "Stack name"
+1. Choose "Outputs" tab.
+    1. For descriptions of outputs, click on the value for `ADescriptionOfOutputs`,
+       which links to [Outputs](#outputs) further down this page.
 
 ## Parameters
 
@@ -329,3 +342,74 @@ Technical information on AWS Cloudformation parameters can be seen at
 1. **Allowed pattern:** `vpc-` followed by unique id. Specifically `^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$`
 1. **Example:** vpc-1a2b3c4d5e6f7g8h9
 1. **Default:** None - a new VPC will be created
+
+## Outputs
+
+### ApiServerHeartbeatUrl
+
+1. **Synopsis:**
+   A URL showing how to reach the
+   [Senzing API Server](https://github.com/Senzing/senzing-api-server)
+   directly.
+   The `/heartbeat` URI path simply demonstrates that the API server is responding.
+   For more URIs, see
+   [SwaggerUrl output value](#swaggerurl).
+
+### DatabaseHost
+
+FIXME: will need to be updated when clustering is enabled.
+
+1. **Synopsis:**
+   More information at [AWS RDS Console](https://console.aws.amazon.com/rds/home).
+
+
+### DatabasePort
+
+1. **Synopsis:**
+   The port used to access each of the databases.
+   More information at [AWS RDS Console](https://console.aws.amazon.com/rds/home).
+
+### Ec2Vpc
+
+1. **Synopsis:**
+   The AWS Resource ID of the Virtual Private Cloud (VPC).
+   More information at [AWS VPC Console](https://console.aws.amazon.com/vpc/home?#vpcs:).
+
+### Host
+
+1. **Synopsis:**
+   The hostname of the loadbalancer that is a proxy to all of the services.
+   More information at [AWS Load Balancers console](https://console.aws.amazon.com/ec2/v2/home?#LoadBalancers:)
+   Also used as the `host` value when using [SwaggerUrl](#swaggerurl).
+
+### Queue
+
+1. **Synopsis:**
+   The queue from which records are ingested into Senzing Engine.
+   In otherwords, this is the queue where records are sent to be inserted into the Senzing Engine.
+   More information at [AWS SQS Console](https://console.aws.amazon.com/sqs/v2/home?#/queues).
+
+### QueueDeadLetter
+
+1. **Synopsis:**
+   The queue to which records that are not able to be ingested into Senzing Engine are sent.
+   In otherwords, if the JSON message is malformed, or Senzing d into the Senzing Engine.
+   More information at [AWS SQS Console](https://console.aws.amazon.com/sqs/v2/home?#/queues).
+
+### Subnet1
+
+TODO:
+
+### Subnet2
+
+TODO:
+
+### SwaggerUrl
+
+TODO:
+
+### WebAppUrl
+
+1. **Synopsis:**
+   A URL showing how to reach the
+   [Senzing Entity Search Web App](https://github.com/Senzing/entity-search-web-app).
