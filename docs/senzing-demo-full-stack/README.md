@@ -179,7 +179,8 @@ Technical information on AWS Cloudformation parameters can be seen at
    Can be used for debugging, copying files to the EFS, or the Senzing Exploratory Tools.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Allowed values:**
+   [ "Yes" | "No" ]
 1. **Default:** No
 1. **References:**
     1. [github.com/Senzing/docker-sshd](https://github.com/Senzing/docker-sshd)
@@ -196,7 +197,8 @@ Technical information on AWS Cloudformation parameters can be seen at
    need to be specified.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Allowed values:**
+   [ "Yes" | "No" ]
 1. **Default:** No
 1. **References:**
     1. [github.com/Senzing/stream-producer](https://github.com/Senzing/stream-producer)
@@ -207,7 +209,8 @@ Technical information on AWS Cloudformation parameters can be seen at
    Optionally, run a container that hosts the SwaggerUI for viewing the Senzing REST API OpenAPI document.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Allowed values:**
+   [ "Yes" | "No" ]
 1. **Default:** No
 1. **References:**
     1. [github.com/Senzing/senzing-rest-api-specification](https://github.com/Senzing/senzing-rest-api-specification).
@@ -218,7 +221,8 @@ Technical information on AWS Cloudformation parameters can be seen at
    Optionally, capture information about the IP traffic going to and from network interfaces in your VPC.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Allowed values:**
+   [ "Yes" | "No" ]
 1. **Default:** No
 1. **References:**
     1. [VPC Flow Logs](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html).
@@ -229,7 +233,8 @@ Technical information on AWS Cloudformation parameters can be seen at
    Optionally, run a container that hosts the Senzing Entity Search Web App.
 1. **Required:** Yes
 1. **Type:** Boolean
-1. **Allowed values:**  [ "Yes" | "No" ]
+1. **Allowed values:**
+   [ "Yes" | "No" ]
 1. **Example:**
 1. **Default:** Yes
 1. **References:**
@@ -379,7 +384,7 @@ FIXME: will need to be updated when clustering is enabled.
 
 1. **Synopsis:**
    The hostname of the loadbalancer that is a proxy to all of the services.
-   More information at [AWS Load Balancers console](https://console.aws.amazon.com/ec2/v2/home?#LoadBalancers:)
+   More information at [AWS Load Balancers console](https://console.aws.amazon.com/ec2/v2/home?#LoadBalancers:).
    Also used as the `host` value when using [SwaggerUrl](#swaggerurl).
 
 ### Queue

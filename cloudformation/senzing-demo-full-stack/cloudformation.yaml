@@ -285,6 +285,10 @@ Rules:
 
 Mappings:
 
+  Constants:
+    Database:
+      Hostname: G2
+
   VpcCidrs:
     vpc:
       cidr: 10.0.0.0/16
@@ -826,6 +830,11 @@ Resources:
     Properties:
       LogGroupName: !Sub "${AWS::StackName}-log-group"
     Type: AWS::Logs::LogGroup
+
+  LogsLogGroupLambdaRandomString:
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-random-string"
+    Type: "AWS::Logs::LogGroup"
 
   LogsLogGroupLambdaRunTask:
     Properties:
@@ -1495,6 +1504,77 @@ Resources:
 #         - !Ref Ec2SubnetPublic2
 
 
+  LambdaFunctionRandomStringNode:
+    Properties:
+      Code:
+        ZipFile: >
+          const response = require("cfn-response");
+          const randomString = (length, chars) => {
+              var result = '';
+              for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+              return result;
+          }
+          exports.handler = (event, context) =>{
+            const str = randomString(event['ResourceProperties']['Length'], '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ');
+            const responseData = {RandomString: str};
+            response.send(event, context, response.SUCCESS, responseData);
+          };
+      Description: Generate a random string
+      FunctionName: !Sub "${AWS::StackName}-lambda-random-string-node"
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: nodejs12.x
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-random-string-node"
+      Timeout: 600
+    Type: AWS::Lambda::Function
+
+
+  LambdaFunctionRandomString:
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import cfnresponse
+          import json
+          import logging
+          import random
+          import string
+          import traceback
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response_data = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      length = int(properties.get('Length', 0))
+                      response_data["RandomString"] = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, response_data)
+
+      Description: Generate string of random characters.
+      FunctionName: !Sub "${AWS::StackName}-lambda-random-string"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-random-string"
+      Timeout: 600
+    Type: AWS::Lambda::Function
+
   LambdaFunctionRunTask:
     Properties:
       Code:
@@ -1747,6 +1827,14 @@ Resources:
 #   Properties:
 #     ServiceToken: !GetAtt LambdaFunctionInitEfs.Arn
 #   Type: Custom::LambdaRunnerInitEfs
+
+
+  LambdaRunnerDbPassword:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      Length: 16
+      ServiceToken: !GetAtt LambdaFunctionRandomString.Arn
+    Type: Custom::LambdaRunnerDbPassword
 
 
   LambdaRunnerInitEfs:
@@ -3096,20 +3184,40 @@ Outputs:
 
   DatabaseHost:
     Description: The connection endpoint for the DB cluster.
-    Value:  !GetAtt RdsDbCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-database-host"
+    Value: !GetAtt RdsDbCluster.Endpoint.Address
+
+  DatabaseName:
+    Description: The name of the database.
+    Export:
+      Name: !Sub "${AWS::StackName}-database-name"
+    Value: !FindInMap [Constants, Database, Hostname]
+
+  DatabasePassword:
+    Description: The randomly generated password for the database.
+    Export:
+      Name: !Sub "${AWS::StackName}-database-password"
+    Value: !GetAtt LambdaRunnerDbPassword.RandomString
 
   DatabasePort:
     Description: The port number that will accept connections on this DB cluster.
-    Value:  !GetAtt RdsDbCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-database-port"
+    Value: !GetAtt RdsDbCluster.Endpoint.Port
+
+  DatabaseUsername:
+    Description: The port number that will accept connections on this DB cluster.
+    Value: !GetAtt RdsDbCluster.Endpoint.Port
 
   Ec2Vpc:
     Description: The ID of the VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-ec2-VpcId"
     Value: !If
       - IfCreateVpcResources
       - !Ref Ec2Vpc
       - !Ref VpcId
-    Export:
-      Name: !Sub "${AWS::StackName}-ec2-VpcId"
 
   Host:
     Description: Host name of public services
