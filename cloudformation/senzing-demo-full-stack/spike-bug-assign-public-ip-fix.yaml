@@ -1,0 +1,586 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >-
+  Demonstrate assignPublicIP bug.
+
+# -----------------------------------------------------------------------------
+# Parameters
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+# -----------------------------------------------------------------------------
+
+Parameters:
+
+  AssignPublicIp:
+    AllowedValues:
+      - "ENABLED"
+      - "DISABLED"
+    Default: "DISABLED"
+    Description: "Value for 'assignPublicIp'"
+    Type: String
+
+# -----------------------------------------------------------------------------
+# Mappings
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+# -----------------------------------------------------------------------------
+
+Mappings:
+
+  VpcCidrs:
+    vpc:
+      cidr: 10.0.0.0/16
+    pubsubnet1:
+      cidr: 10.0.0.0/24
+    privsubnet2:
+      cidr: 10.0.1.0/24
+
+# -----------------------------------------------------------------------------
+# Resources
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+# -----------------------------------------------------------------------------
+
+Resources:
+
+# -- Iam -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleInitEfs:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-init-efs"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-init-efs"
+    Type: AWS::IAM::Role
+
+
+  IamRoleLambda:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+    Type: AWS::IAM::Role
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+  IamPolicyLoggingCreateStream:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-logging-create-stream
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:*
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyPassRole:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-pass-role
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleInitEfs
+       - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyTaskRunner:
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-iam-policy-task-runner
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - ecs:DescribeTasks
+              - ecs:RunTask
+            Effect: Allow
+            Resource:
+              - "*"
+        Version: "2012-10-17"
+      Roles:
+       - !Ref IamRoleLambda
+    Type: AWS::IAM::Policy
+
+# -- Logging ------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
+
+  LogsLogGroupMain:
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
+    Type: AWS::Logs::LogGroup
+
+  LogsLogGroupLambdaRunTaskAndWait:
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-run-task-and-wait"
+    Type: "AWS::Logs::LogGroup"
+
+# -- Cloud, subnets, routing --------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+
+  Ec2Vpc:
+    Properties:
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - vpc
+        - cidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-vpc"
+    Type: AWS::EC2::VPC
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+
+  Ec2SubnetPublic1:
+    Properties:
+      AvailabilityZone: !Select
+          - '0'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet1
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-1"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+
+  Ec2SubnetPublic2:
+    Properties:
+      AvailabilityZone: !Select
+          - '1'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - privsubnet2
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-2"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+
+  EcsSecurityGroupLambdaRunner:
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-lambda-runner"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::SecurityGroup
+
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+       Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt EIP.AllocationId
+      SubnetId: !Ref Ec2SubnetPublic1
+
+  EcsSecurityGroupInternal:
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: HTTP
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: HTTPS
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        -
+          CidrIp: !FindInMap
+            - VpcCidrs
+            - vpc
+            - cidr
+          Description: NFS
+          FromPort: 2049
+          IpProtocol: tcp
+          ToPort: 2049
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-internal"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::SecurityGroup
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+
+  Ec2InternetGateway:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
+    Type: AWS::EC2::InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
+
+  Ec2VpcGatewayAttachment:
+    Properties:
+      InternetGatewayId: !Ref Ec2InternetGateway
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::VPCGatewayAttachment
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+
+  Ec2RouteTable:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::RouteTable
+
+  Ec2RouteTableprivate:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table-private"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::RouteTable
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+
+  Ec2Route:
+    DependsOn:
+     - Ec2VpcGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Ec2InternetGateway
+      RouteTableId: !Ref Ec2RouteTable
+    Type: AWS::EC2::Route
+
+  Ec2RoutePrivate:
+    Type: AWS::EC2::Route
+    DependsOn:
+     - NatGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+      RouteTableId: !Ref Ec2RouteTableprivate
+
+
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+
+  Ec2SubnetRouteTableAssociation1:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTable
+      SubnetId: !Ref Ec2SubnetPublic1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+
+  Ec2SubnetRouteTableAssociation2:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTableprivate
+      SubnetId: !Ref Ec2SubnetPublic2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+# -- Elastic File System ------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-filesystem.html
+
+  EfsFileSystem:
+    Properties:
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-efs-filesystem"
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+    Type: AWS::EFS::FileSystem
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-efs-mounttarget.html
+
+  EfsMountTarget1:
+    Properties:
+      FileSystemId:
+        Ref: EfsFileSystem
+      SecurityGroups:
+        - Ref: EcsSecurityGroupInternal
+      SubnetId:
+        Ref: Ec2SubnetPublic1
+    Type: AWS::EFS::MountTarget
+
+
+  EfsMountTarget2:
+    Properties:
+      FileSystemId:
+        Ref: EfsFileSystem
+      SecurityGroups:
+        - Ref: EcsSecurityGroupInternal
+      SubnetId:
+        Ref: Ec2SubnetPublic2
+    Type: AWS::EFS::MountTarget
+
+# -- ECS Cluster --------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
+
+  EcsCluster:
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      ClusterSettings:
+        -
+          Name: containerInsights
+          Value: disabled
+    Type: AWS::ECS::Cluster
+
+# -- LambdaFunction -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
+
+  LambdaFunctionRunTaskAndWait:
+    DependsOn: Ec2SubnetRouteTableAssociation2
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import cfnresponse
+          import datetime
+          import json
+          import logging
+          import traceback
+          from json import JSONEncoder
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          class DateTimeEncoder(JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, (datetime.date, datetime.datetime)):
+                      return obj.isoformat()
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      run_task_parameters = properties.get('RunTaskParameters', {})
+
+                      # Change strings to integers.
+
+                      numbers = [
+                          "count",
+                      ]
+                      for number in numbers:
+                          if number in run_task_parameters:
+                              run_task_parameters[number] = int(run_task_parameters[number])
+
+                      # Make AWS ECS request.
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+
+                      ecs = boto3.client('ecs')
+                      response = ecs.run_task(**run_task_parameters)
+
+                      # Wait for completion.
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#waiters
+
+                      waiter = ecs.get_waiter('tasks_stopped')
+                      waiter.wait(
+                          cluster=properties['ClusterId'],
+                          tasks=[response['tasks'][0]['taskArn']],
+                      )
+
+                      response['describe_task'] = ecs.describe_tasks(
+                          cluster=properties['ClusterId'],
+                          tasks=[response['tasks'][0]['taskArn']],
+                      )
+                      logger.info("describe_task response: {0}".format(json.dumps(response['describe_task'], cls=DateTimeEncoder)))
+
+                      exit_code = response.get('describe_task', {}).get('tasks', [{}])[0].get('containers', [{}])[0].get('exitCode', 99)
+                      if exit_code != 0:
+                          result = cfnresponse.FAILED
+                  logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
+
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, {})
+
+      Description: Runs an ECS task and waits until completion
+      FunctionName: !Sub "${AWS::StackName}-lambda-run-task-and-wait"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-run-task-and-wait"
+      Timeout: 600
+    Type: AWS::Lambda::Function
+
+
+# -- Run ECS tasks-------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
+
+  LambdaRunnerInitEfs:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      RunTaskParameters:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ecs.html#ECS.Client.run_task
+        cluster: !Ref EcsCluster
+        count: 1
+        launchType: FARGATE
+        networkConfiguration:
+          awsvpcConfiguration:
+            assignPublicIp: !Ref AssignPublicIp
+            securityGroups:
+              - !Ref EcsSecurityGroupLambdaRunner
+            subnets:
+              - !Ref Ec2SubnetPublic2
+        platformVersion: 1.4.0
+        tags:
+          - key: Name
+            value: !Sub "${AWS::StackName}-lambda-runner-init-efs"
+        taskDefinition: !Ref EcsTaskDefinitionInitEfs
+      ServiceToken: !GetAtt LambdaFunctionRunTaskAndWait.Arn
+    Type: Custom::LambdaRunnerInitEfs
+
+# -- EcsTaskDefinition --------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+
+  EcsTaskDefinitionInitEfs:
+    DependsOn:
+      - EfsMountTarget1
+      - EfsMountTarget2
+    Properties:
+      ContainerDefinitions:
+        -
+          Command:
+            - "mkdir"
+            - "/efs/g2"
+            - "&&"
+            - "mkdir"
+            - "-p"
+            - "/efs/data/1.0.0"
+            - "&&"
+            - "mkdir"
+            - "/efs/etc"
+            - "&&"
+            - "mkdir"
+            - "/efs/var"
+          Essential: true
+          Image: busybox
+          LinuxParameters:
+            Capabilities: {}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "${AWS::StackName}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-efs-root
+              ContainerPath: /efs
+              ReadOnly: false
+          Name: efsinitcontainer
+          Privileged: false
+          PseudoTerminal: false
+          ReadonlyRootFilesystem: false
+      Cpu: "512"
+      ExecutionRoleArn: !GetAtt IamRoleInitEfs.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-init-efs"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-init-efs"
+      Volumes:
+        -
+          Name: senzing-efs-root
+          EFSVolumeConfiguration:
+            AuthorizationConfig: {}
+            FilesystemId:
+              Ref: EfsFileSystem
+            RootDirectory: "/"
+    Type: AWS::ECS::TaskDefinition
