@@ -4,6 +4,7 @@ AWSTemplateFormatVersion: 2010-09-09
 # Tests:
 #     Lint: https://github.com/aws-cloudformation/cfn-python-lint
 #     Nag: https://github.com/stelligent/cfn_nag
+#     aws cloudformation validate-template: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudformation/validate-template.html
 
 # TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
 # TODO: Fix Help URLs.  When hub.senzing.com is available.
@@ -11,12 +12,6 @@ AWSTemplateFormatVersion: 2010-09-09
 # TODO: Test with existing VPC and Availablity Zones
 # TODO: In Rules, fix detection of empty strings
 # TODO: CIDR variable for restricting access in EcsSecurityGroup
-# TODO: Improve EcsSecurityGroup so it's not a monolith
-# TODO: Add Jupyter
-# TODO: Add X-term (be aware of required stickiness)
-# TODO: Autoscale Entity Search Web App
-# TODO: User-supplied password for "senzing/sshd" (Needs support in GitHub project)
-# TODO: Fix "Case sensitivity in RdsDbSubnetGroup" https://console.aws.amazon.com/support/home#/case/?displayId=7725760511
 # TODO: Fix TimeoutAction https://console.aws.amazon.com/support/home#/case/?displayId=7705681311
 
 Description: >-
@@ -44,13 +39,13 @@ Metadata:
           - CidrInbound
       -
         Label:
-          default: "Optional: Identify existing resources"
+          default: 'Optional: Identify existing resources'
         Parameters:
           - VpcId
           - VpcAvailabilityZones
       -
         Label:
-          default: "Optional: Stream-producer"
+          default: 'Optional: Stream-producer'
         Parameters:
           - RunStreamProducer
           - SenzingInputUrl
@@ -58,12 +53,17 @@ Metadata:
           - SenzingRecordMax
       -
         Label:
-          default: "Optional: Additional services"
+          default: 'Optional: Additional services'
         Parameters:
+          - RunApiServer
+          - RunJupyter
+          - RunRedoer
           - RunSshd
+          - RunStreamLoader
           - RunSwagger
-          - RunWebApp
           - RunVpcFlowLogs
+          - RunWebApp
+          - RunXterm
 
 
     ParameterLabels:
@@ -73,17 +73,27 @@ Metadata:
           https://senzing.com/end-user-license-agreement,
           enter 'I_ACCEPT_THE_SENZING_EULA'.
       CidrInbound:
-        default: "Required: Allowed inbound connections using CIDR notation."
+        default: 'Required: Allowed inbound connections using CIDR notation.'
+      RunApiServer:
+        default: 'Optional: Would you like to run Senzing API server?'
+      RunJupyter:
+        default: 'Optional: Would you like to run Jupyter Notebooks service?'
+      RunRedoer:
+        default: 'Optional: Would you like to run Senzing Redoer service?'
       RunSshd:
-        default: "Optional: Would you like to run sshd service?"
+        default: 'Optional: Would you like to run sshd service?'
+      RunStreamLoader:
+        default: 'Optional: Would you like to run stream-producer service?'
       RunStreamProducer:
-        default: "Optional: Would you like to run stream-producer job?"
+        default: 'Optional: Would you like to run stream-producer job?'
       RunSwagger:
-        default: "Optional: Would you like to run Swagger service?"
+        default: 'Optional: Would you like to run Swagger service?'
       RunVpcFlowLogs:
-        default: "Optional: Would you like to enable AWS VPC Flow Logs?"
+        default: 'Optional: Would you like to enable AWS VPC Flow Logs?'
       RunWebApp:
-        default: "Optional: Would you like to run the Senzing WebApp service?"
+        default: 'Optional: Would you like to run the Senzing WebApp service?'
+      RunXterm:
+        default: 'Optional: Would you like to run the Senzing XTerm service?'
       SenzingInputUrl:
         default: >-
           Required if running stream-producer job.
@@ -119,84 +129,124 @@ Metadata:
 Parameters:
 
   AcceptEula:
-    AllowedPattern: '^$|^I_ACCEPT_THE_SENZING_EULA$'
+    AllowedPattern: '.+|^I_ACCEPT_THE_SENZING_EULA$'
     ConstraintDescription: AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
-    Default: ''
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#accepteula"
+    Default: '_'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#accepteula'
     Type: String
 
   CidrInbound:
     AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
     ConstraintDescription: Inbound CIDR must be in the format n.n.n.n/n
     Default: 0.0.0.0/0
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#cidrinbound"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#cidrinbound'
+    Type: String
+
+  RunApiServer:
+    AllowedValues:
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runapiserver'
+    Type: String
+
+  RunJupyter:
+    AllowedValues:
+      - 'No'
+      - 'Yes'
+    Default: 'No'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runjupyter'
+    Type: String
+
+  RunRedoer:
+    AllowedValues:
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runredoer'
     Type: String
 
   RunSshd:
     AllowedValues:
-      - "No"
-      - "Yes"
-    Default: "Yes"
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd"
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runsshd'
+    Type: String
+
+  RunStreamLoader:
+    AllowedValues:
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamloader'
     Type: String
 
   RunStreamProducer:
     AllowedValues:
-      - "No"
-      - "Yes"
-    Default: "Yes"
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer"
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runstreamproducer'
     Type: String
 
   RunSwagger:
     AllowedValues:
-      - "No"
-      - "Yes"
-    Default: "Yes"
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger"
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runswagger'
     Type: String
 
   RunVpcFlowLogs:
     AllowedValues:
-      - "No"
-      - "Yes"
-    Default: "No"
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runvpcflowlogs"
+      - 'No'
+      - 'Yes'
+    Default: 'No'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runvpcflowlogs'
     Type: String
 
   RunWebApp:
     AllowedValues:
-      - "No"
-      - "Yes"
-    Default: "Yes"
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp"
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#runwebapp'
+    Type: String
+
+  RunXterm:
+    AllowedValues:
+      - 'No'
+      - 'Yes'
+    Default: 'Yes'
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#xterm'
     Type: String
 
   SenzingInputUrl:
     Default: https://public-read-access.s3.amazonaws.com/TestDataSets/test-dataset-100m.json.gz
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinginputurl"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinginputurl'
     Type: String
 
   SenzingLicenseAsBase64:
-#   AllowedPattern: '^$|[^-A-Za-z0-9+\/=\s]|=[^=]|={3,}$'
-    ConstraintDescription: "Must contain only Base64 characters. see http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinglicenseasbase64"
-    Default: ''
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinglicenseasbase64"
+#   AllowedPattern: ' ^$|[^-A-Za-z0-9+\/=\s]|=[^=]|={3,}$'
+    ConstraintDescription: 'Must contain only Base64 characters. see http://senzing.github.io/aws-cloudformation-ecs-poc-simple/senzing-demo-full-stack#senzinglicenseasbase64'
+    Default: ' '
+    Description: 'Help: http://senzing.github.io/aws-cloudformation/senzing-demo-full-stack#senzinglicenseasbase64'
     Type: String
 
   SenzingRecordMax:
     Default: 100000
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmax"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmax'
     Type: Number
 
   SenzingRecordMin:
     Default: 0
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmin"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmin'
     Type: Number
 
   VpcAvailabilityZones:
     Default: ''
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcavailabilityzones"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcavailabilityzones'
     Type: CommaDelimitedList
 
   VpcId:
@@ -205,7 +255,7 @@ Parameters:
       VPC Id must begin with 'vpc-' followed by either an 8 or 17 character
       identifier, or leave blank to have a new VPC created
     Default: ''
-    Description: "Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcid"
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcid'
     Type: String
 
 # -----------------------------------------------------------------------------
@@ -237,14 +287,20 @@ Mappings:
     Database:
       Name: G2
       Username: senzing
+    Stack:
+      Name: experimental
 
   VpcCidrs:
     vpc:
       cidr: 10.0.0.0/16
     pubsubnet1:
-      cidr: 10.0.0.0/24
-    pubsubnet2:
       cidr: 10.0.1.0/24
+    pubsubnet2:
+      cidr: 10.0.2.0/24
+    privsubnet1:
+      cidr: 10.0.3.0/24
+    privsubnet2:
+      cidr: 10.0.4.0/24
 
 # -----------------------------------------------------------------------------
 # Conditions
@@ -257,25 +313,45 @@ Conditions:
     - !Ref VpcId
     - ''
 
+  IfRunApiServer: !Equals
+    - !Ref RunApiServer
+    - 'Yes'
+
+  IfRunJupyter: !Equals
+    - !Ref RunJupyter
+    - 'Yes'
+
+  IfRunRedoer: !Equals
+    - !Ref RunRedoer
+    - 'Yes'
+
   IfRunSshd: !Equals
     - !Ref RunSshd
-    - "Yes"
+    - 'Yes'
+
+  IfRunStreamLoader: !Equals
+    - !Ref RunStreamLoader
+    - 'Yes'
 
   IfRunStreamProducer: !Equals
     - !Ref RunStreamProducer
-    - "Yes"
+    - 'Yes'
 
   IfRunSwagger: !Equals
     - !Ref RunSwagger
-    - "Yes"
+    - 'Yes'
 
   IfRunVpcFlowLogs: !Equals
     - !Ref RunVpcFlowLogs
-    - "Yes"
+    - 'Yes'
 
   IfRunWebApp: !Equals
     - !Ref RunWebApp
-    - "Yes"
+    - 'Yes'
+
+  IfRunXterm: !Equals
+    - !Ref RunXterm
+    - 'Yes'
 
   IfUseSpecifiedVpcAvailabilityZones: !Not
     - !Equals
@@ -1723,35 +1799,10 @@ Resources:
 #         - !Ref Ec2SubnetPublic2
 
 
-  LambdaFunctionRandomStringNode:
-    Properties:
-      Code:
-        ZipFile: >
-          const response = require("cfn-response");
-          const randomString = (length, chars) => {
-              var result = '';
-              for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
-              return result;
-          }
-          exports.handler = (event, context) =>{
-            const str = randomString(event['ResourceProperties']['Length'], '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ');
-            const responseData = {RandomString: str};
-            response.send(event, context, response.SUCCESS, responseData);
-          };
-      Description: Generate a random string
-      FunctionName: !Sub "${AWS::StackName}-lambda-random-string-node"
-      Handler: index.handler
-      MemorySize: 128
-      Role: !GetAtt IamRoleLambda.Arn
-      Runtime: nodejs12.x
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-lambda-random-string-node"
-      Timeout: 600
-    Type: AWS::Lambda::Function
-
-
   LambdaFunctionRandomString:
+    DependsOn:
+     - Ec2SubnetRouteTableAssociationPrivate1
+     - Ec2SubnetRouteTableAssociationPrivate2
     Properties:
       Code:
         ZipFile: |
@@ -3777,6 +3828,8 @@ Resources:
     Condition: IfRunApiServer
     DependsOn:
      - LambdaRunnerInitSenzing
+     - ListenerApiServerPublic
+     - ListenerApiServerPrivate
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -3813,6 +3866,7 @@ Resources:
     Condition: IfRunJupyter
     DependsOn:
      - LambdaRunnerInitSenzing
+     - ListenerJupyter
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -3825,7 +3879,7 @@ Resources:
           TargetGroupArn: !Ref TargetGroupJupyter
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
           SecurityGroups:
             - !Ref Ec2SecurityGroupInternal
           Subnets:
@@ -3925,7 +3979,7 @@ Resources:
   EcsServiceSwagger:
     Condition: IfRunSwagger
     DependsOn:
-     - LoadBalancerPublic
+     - ListenerSwagger
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -3958,6 +4012,7 @@ Resources:
     Condition: IfRunWebApp
     DependsOn:
      - LoadBalancerPublic
+     - ListenerWebApp
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -3990,6 +4045,7 @@ Resources:
     Condition: IfRunXterm
     DependsOn:
      - LambdaRunnerInitSenzing
+     - ListenerXterm
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -4002,7 +4058,7 @@ Resources:
           TargetGroupArn: !Ref TargetGroupXterm
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
           SecurityGroups:
             - !Ref Ec2SecurityGroupInternal
           Subnets:
