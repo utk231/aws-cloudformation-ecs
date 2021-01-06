@@ -7,12 +7,11 @@ AWSTemplateFormatVersion: 2010-09-09
 #     aws cloudformation validate-template: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudformation/validate-template.html
 
 # TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
-# TODO: Fix Help URLs.  When hub.senzing.com is available.
+# TODO: When hub.senzing.com is available, fix Help URLs.
 # TODO: Cleanup "nag" errors and warnings
 # TODO: Test with existing VPC and Availablity Zones
 # TODO: In Rules, fix detection of empty strings
-# TODO: CIDR variable for restricting access in EcsSecurityGroup
-# TODO: Fix TimeoutAction https://console.aws.amazon.com/support/home#/case/?displayId=7705681311
+# TODO: Jupyter inconsistent connection
 
 Description: >-
   Senzing aws-cloudformation-ecs Version: 0.1.0
@@ -229,7 +228,7 @@ Parameters:
 
   SenzingLicenseAsBase64:
 #   AllowedPattern: ' ^$|[^-A-Za-z0-9+\/=\s]|=[^=]|={3,}$'
-    ConstraintDescription: 'Must contain only Base64 characters. see http://senzing.github.io/aws-cloudformation-ecs-poc-simple/senzing-demo-full-stack#senzinglicenseasbase64'
+    ConstraintDescription: 'Must contain only Base64 characters. see http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzinglicenseasbase64'
     Default: ' '
     Description: 'Help: http://senzing.github.io/aws-cloudformation/senzing-demo-full-stack#senzinglicenseasbase64'
     Type: String
@@ -4173,65 +4172,65 @@ Outputs:
 
   ApiServerHeartbeatUrl:
     Condition: IfRunApiServer
-    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#apiserverheartbeaturl'
+    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs/#apiserverheartbeaturl'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8250/heartbeat"
 
   DatabaseHostCore:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databasehostcore'
+    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostcore'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-core"
     Value: !GetAtt RdsDbClusterCore.Endpoint.Address
 
   DatabaseHostLibfeat:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databasehostlibfeat'
+    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostlibfeat'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-libfeat"
     Value: !GetAtt RdsDbClusterLibfeat.Endpoint.Address
 
   DatabaseHostRes:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databasehostres'
+    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostres'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-res"
     Value: !GetAtt RdsDbClusterRes.Endpoint.Address
 
   DatabaseName:
-    Description: 'The name of the database. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databasename'
+    Description: 'The name of the database. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasename'
     Export:
       Name: !Sub "${AWS::StackName}-database-name"
     Value: !FindInMap [Constants, Database, Name]
 
   DatabasePassword:
-    Description: 'The randomly generated password for the database. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databasepassword'
+    Description: 'The randomly generated password for the database. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasepassword'
     Export:
       Name: !Sub "${AWS::StackName}-database-password"
     Value: !GetAtt LambdaRunnerDbPassword.RandomString
 
   DatabasePortCore:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databaseportcore'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportcore'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-core"
     Value: !GetAtt RdsDbClusterCore.Endpoint.Port
 
   DatabasePortLibfeat:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databaseportlibfeat'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportlibfeat'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-libfeat"
     Value: !GetAtt RdsDbClusterLibfeat.Endpoint.Port
 
   DatabasePortRes:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databaseportres'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportres'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-res"
     Value: !GetAtt RdsDbClusterRes.Endpoint.Port
 
   DatabaseUsername:
-    Description: 'The administrative user name. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#databaseusername'
+    Description: 'The administrative user name. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseusername'
     Export:
       Name: !Sub "${AWS::StackName}-database-username"
     Value: !FindInMap [Constants, Database, Username]
 
   Ec2Vpc:
-    Description: 'The ID of the VPC. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#ec2vpc'
+    Description: 'The ID of the VPC. Help: http://senzing.github.io/aws-cloudformation-ecs/#ec2vpc'
     Export:
       Name: !Sub "${AWS::StackName}-ec2-VpcId"
     Value: !If
@@ -4240,57 +4239,57 @@ Outputs:
       - !Ref VpcId
 
   Host:
-    Description: 'Host name of public services. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#host'
+    Description: 'Host name of public services. Help: http://senzing.github.io/aws-cloudformation-ecs/#host'
     Export:
       Name: !Sub "${AWS::StackName}-host"
     Value: !GetAtt LoadBalancerPublic.DNSName
 
   JupyterUrl:
     Condition: IfRunJupyter
-    Description: 'Url for Jupyter Notebooks. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#jupyterurl'
+    Description: 'Url for Jupyter Notebooks. Help: http://senzing.github.io/aws-cloudformation-ecs/#jupyterurl'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8888"
 
   Queue:
-    Description: 'URL of the input queue. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#queue'
+    Description: 'URL of the input queue. Help: http://senzing.github.io/aws-cloudformation-ecs/#queue'
     Export:
       Name: !Sub "${AWS::StackName}-queue"
     Value: !Ref SqsQueue
 
   QueueDeadLetter:
-    Description: 'URL of the dead-letter queue. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#queuedeadletter'
+    Description: 'URL of the dead-letter queue. Help: http://senzing.github.io/aws-cloudformation-ecs/#queuedeadletter'
     Export:
       Name: !Sub "${AWS::StackName}-queue-deadletter"
     Value: !Ref SqsQueueDeadLetter
 
   SshPassword:
-    Description: 'The randomly generated password for SSH access. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#sshpassword'
+    Description: 'The randomly generated password for SSH access. Help: http://senzing.github.io/aws-cloudformation-ecs/#sshpassword'
     Export:
       Name: !Sub "${AWS::StackName}-ssh-password"
     Value: !GetAtt LambdaRunnerSshPassword.RandomString
 
   SubnetPublic1:
-    Description: 'The ID of public subnet 1. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#subnetpublic1'
+    Description: 'The ID of public subnet 1. Help: http://senzing.github.io/aws-cloudformation-ecs/#subnetpublic1'
     Export:
       Name: !Sub "${AWS::StackName}-subnet-public-1"
     Value: !Ref Ec2SubnetPublic1
 
   SubnetPublic2:
-    Description: 'The ID of public subnet 2. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#subnetpublic2'
+    Description: 'The ID of public subnet 2. Help: http://senzing.github.io/aws-cloudformation-ecs/#subnetpublic2'
     Export:
       Name: !Sub "${AWS::StackName}-subnet-public-2"
     Value: !Ref Ec2SubnetPublic2
 
   SwaggerUrl:
     Condition: IfRunSwagger
-    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#swaggerurl'
+    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs/#swaggerurl'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
 
   WebAppUrl:
     Condition: IfRunWebApp
-    Description: 'Url for Senzing Web App. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#webappurl'
+    Description: 'Url for Senzing Web App. Help: http://senzing.github.io/aws-cloudformation-ecs/#webappurl'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8251"
 
   XtermUrl:
     Condition: IfRunXterm
-    Description: 'Url for Senzing X-Term. Help: http://senzing.github.io/aws-cloudformation-ecs-poc-simple/#xtermurl'
+    Description: 'Url for Senzing X-Term. Help: http://senzing.github.io/aws-cloudformation-ecs/#xtermurl'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:5000"
