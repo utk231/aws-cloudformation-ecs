@@ -205,114 +205,7 @@ Resources:
       VpcId: !Ref Ec2Vpc
     Type: AWS::EC2::Subnet
 
-
-  Ec2SubnetPrivate1:
-    Properties:
-      AvailabilityZone: !Select
-          - '0'
-          - !GetAZs
-            Ref: AWS::Region
-      CidrBlock: !FindInMap
-        - VpcCidrs
-        - privsubnet1
-        - cidr
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-subnet-private-1"
-      VpcId: !Ref Ec2Vpc
-    Type: AWS::EC2::Subnet
-
-
-  Ec2SubnetPrivate2:
-    Properties:
-      AvailabilityZone: !Select
-          - '1'
-          - !GetAZs
-            Ref: AWS::Region
-      CidrBlock: !FindInMap
-        - VpcCidrs
-        - privsubnet2
-        - cidr
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-subnet-private-2"
-      VpcId: !Ref Ec2Vpc
-    Type: AWS::EC2::Subnet
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-eip.html
-
-  Ec2Eip:
-    Properties:
-      Domain: vpc
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-eip"
-    Type: AWS::EC2::EIP
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-natgateway.html
-
-  Ec2NatGateway:
-    Properties:
-      AllocationId: !GetAtt Ec2Eip.AllocationId
-      SubnetId: !Ref Ec2SubnetPublic1
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-nat-gateway"
-    Type: AWS::EC2::NatGateway
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
-
-  Ec2SecurityGroupInternal:
-    Properties:
-      GroupDescription: !Sub "${AWS::StackName} - ECS internal open ports."
-      SecurityGroupEgress:
-        -
-          CidrIp: 0.0.0.0/0
-          Description: All
-          IpProtocol: '-1'
-      SecurityGroupIngress:
-        -
-          CidrIp: !FindInMap
-            - VpcCidrs
-            - vpc
-            - cidr
-          Description: SSH
-          FromPort: 22
-          IpProtocol: tcp
-          ToPort: 22
-        -
-          CidrIp: !FindInMap
-            - VpcCidrs
-            - vpc
-            - cidr
-          Description: HTTP
-          FromPort: 80
-          IpProtocol: tcp
-          ToPort: 80
-        -
-          CidrIp: !FindInMap
-            - VpcCidrs
-            - vpc
-            - cidr
-          Description: HTTPS
-          FromPort: 443
-          IpProtocol: tcp
-          ToPort: 443
-        -
-          CidrIp: !FindInMap
-            - VpcCidrs
-            - vpc
-            - cidr
-          Description: Swagger UI
-          FromPort: 8080
-          IpProtocol: tcp
-          ToPort: 8080
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-security-group-internal"
-      VpcId: !Ref Ec2Vpc
-    Type: AWS::EC2::SecurityGroup
-
 
   Ec2SecurityGroupLoadBalancerPublic:
     Properties:
@@ -367,15 +260,6 @@ Resources:
       VpcId: !Ref Ec2Vpc
     Type: AWS::EC2::RouteTable
 
-
-  Ec2RouteTablePrivate:
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-ec2-route-table-private"
-      VpcId: !Ref Ec2Vpc
-    Type: AWS::EC2::RouteTable
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
 
   Ec2RoutePublic:
@@ -385,14 +269,6 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Ec2InternetGateway
       RouteTableId: !Ref Ec2RouteTablePublic
-    Type: AWS::EC2::Route
-
-
-  Ec2RoutePrivate:
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref Ec2NatGateway
-      RouteTableId: !Ref Ec2RouteTablePrivate
     Type: AWS::EC2::Route
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
@@ -408,20 +284,6 @@ Resources:
     Properties:
       RouteTableId: !Ref Ec2RouteTablePublic
       SubnetId: !Ref Ec2SubnetPublic2
-    Type: AWS::EC2::SubnetRouteTableAssociation
-
-
-  Ec2SubnetRouteTableAssociationPrivate1:
-    Properties:
-      RouteTableId: !Ref Ec2RouteTablePrivate
-      SubnetId: !Ref Ec2SubnetPrivate1
-    Type: AWS::EC2::SubnetRouteTableAssociation
-
-
-  Ec2SubnetRouteTableAssociationPrivate2:
-    Properties:
-      RouteTableId: !Ref Ec2RouteTablePrivate
-      SubnetId: !Ref Ec2SubnetPrivate2
     Type: AWS::EC2::SubnetRouteTableAssociation
 
 # -- ECS Cluster --------------------------------------------------------------
@@ -498,7 +360,7 @@ Resources:
 #   Properties:
 #     Certificates:
 #       - !Ref CertificateArn
-#     ListenerArn: String
+#     ListenerArn: !Ref ListenerSwagger
 #   Type: AWS::ElasticLoadBalancingV2::ListenerCertificate
 
 # -- Route53RecordSet ---------------------------------------------------------
@@ -579,12 +441,12 @@ Resources:
           TargetGroupArn: !Ref TargetGroupSwagger
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref Ec2SecurityGroupInternal
+            - !Ref Ec2SecurityGroupLoadBalancerPublic
           Subnets:
-            - !Ref Ec2SubnetPrivate1
-            - !Ref Ec2SubnetPrivate2
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
       PlatformVersion: 1.4.0
       PropagateTags: TASK_DEFINITION
       ServiceName: swagger
