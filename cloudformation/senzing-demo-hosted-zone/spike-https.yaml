@@ -86,6 +86,26 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
 
+  IamRoleLambda:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+    Type: AWS::IAM::Role
+
   IamRoleSwagger:
     Properties:
       AssumeRolePolicyDocument:
@@ -120,6 +140,7 @@ Resources:
               - '*'
         Version: '2012-10-17'
       Roles:
+       - !Ref IamRoleLambda
        - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
@@ -138,6 +159,7 @@ Resources:
               - '*'
         Version: '2012-10-17'
       Roles:
+       - !Ref IamRoleLambda
        - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
@@ -150,6 +172,11 @@ Resources:
       LogGroupName: !Sub
         - "/senzing/${StackName}/${AWS::StackName}"
         - StackName: !FindInMap [Constants, Stack, Name]
+    Type: AWS::Logs::LogGroup
+
+  LogsLogGroupLambdaFindDomainName:
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-find-domain-name"
     Type: AWS::Logs::LogGroup
 
 # -- Cloud, subnets, routing --------------------------------------------------
@@ -296,6 +323,82 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-cluster"
     Type: AWS::ECS::Cluster
+
+# -- LambdaFunction -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
+
+  LambdaFunctionFindDomainName:
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import cfnresponse
+          import datetime
+          import json
+          import logging
+          import traceback
+          from json import JSONEncoder
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          class DateTimeEncoder(JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, (datetime.date, datetime.datetime)):
+                      return obj.isoformat()
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      hosted_zone_id = properties.get('HostedZoneId', {})
+
+                      # Make AWS ECS request.
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/route53.html
+
+                      route53 = boto3.client('route53')
+                      response = route53.get_hosted_zone(Id=hosted_zone_id)
+                      response_data["Response"] = response
+                  logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
+
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, {})
+
+      Description: Runs an ECS task.
+      FunctionName: !Sub "${AWS::StackName}-lambda-find-domain-name"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-find-domain-name"
+      Timeout: 30
+    Type: AWS::Lambda::Function
+
+# -- Run ECS tasks-------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
+
+  LambdaRunnerFindDomainName:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      HostedZoneId: !Ref Route53HostedZoneId
+      ServiceToken: !GetAtt LambdaFunctionFindDomainName.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-find-domain-name"
+    Type: Custom::LambdaRunnerFindDomainName
 
 # -- Load balancing -----------------------------------------------------------
 
@@ -505,3 +608,7 @@ Outputs:
   UrlSwaggerHttps:
     Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
     Value: !Sub "https://${AWS::StackName}.senzing-mjd.com:8081"
+
+  LambdaRunnerFindDomainName:
+    Description: 'The randomly generated password for SSH access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#sshpassword'
+    Value: !GetAtt LambdaRunnerFindDomainName.Response
