@@ -346,22 +346,15 @@ Resources:
 
   ListenerSwagger:
     Properties:
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
       DefaultActions:
         - TargetGroupArn: !Ref TargetGroupSwagger
           Type: forward
       LoadBalancerArn: !Ref LoadBalancerPublic
       Port: 8080
-      Protocol: HTTP
+      Protocol: HTTPS
     Type: AWS::ElasticLoadBalancingV2::Listener
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listenercertificate.html
-
-# ListenerCertificateSwagger:
-#   Properties:
-#     Certificates:
-#       - !Ref CertificateArn
-#     ListenerArn: !Ref ListenerSwagger
-#   Type: AWS::ElasticLoadBalancingV2::ListenerCertificate
 
 # -- Route53RecordSet ---------------------------------------------------------
 
