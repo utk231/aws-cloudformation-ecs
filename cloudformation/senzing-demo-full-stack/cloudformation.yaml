@@ -6,13 +6,6 @@ AWSTemplateFormatVersion: 2010-09-09
 #     Nag: https://github.com/stelligent/cfn_nag
 #     aws cloudformation validate-template: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudformation/validate-template.html
 
-# TODO: Create resource(s) that guarantee EFS is "available". https://console.aws.amazon.com/support/home#/case/?displayId=7705802111&language=en
-# TODO: When hub.senzing.com is available, fix Help URLs.
-# TODO: Cleanup "nag" errors and warnings
-# TODO: Test with existing VPC and Availablity Zones
-# TODO: In Rules, fix detection of empty strings
-# TODO: Jupyter inconsistent connection
-
 Description: >-
   Senzing aws-cloudformation-ecs Version: 0.1.0
   For more information see https://github.com/Senzing/aws-cloudformation-ecs
@@ -131,14 +124,14 @@ Parameters:
     AllowedPattern: '.+|^I_ACCEPT_THE_SENZING_EULA$'
     ConstraintDescription: AcceptEula parameter must be 'I_ACCEPT_THE_SENZING_EULA'
     Default: '_'
-    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#accepteula'
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs/#accepteula'
     Type: String
 
   CidrInbound:
     AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
     ConstraintDescription: Inbound CIDR must be in the format n.n.n.n/n
     Default: 0.0.0.0/0
-    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#cidrinbound'
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs/#cidrinbound'
     Type: String
 
   RunApiServer:
@@ -2756,7 +2749,7 @@ Resources:
             - '*'
             - -enableAdmin
           Essential: true
-          Image: senzing/senzing-api-server:2.3.1
+          Image: public.ecr.aws/d5v4a2g3/senzing-api-server:2.3.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2857,7 +2850,7 @@ Resources:
             - '-p'
             - '/efs/var/shared'
           Essential: true
-          Image: busybox
+          Image: public.ecr.aws/d5v4a2g3/busybox
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2909,7 +2902,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: senzing/postgresql-client:1.0.0
+          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2961,7 +2954,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: senzing/postgresql-client:1.0.0
+          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3013,7 +3006,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: senzing/postgresql-client:1.0.0
+          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3071,7 +3064,7 @@ Resources:
               Name: SENZING_LICENSE_BASE64_ENCODED
               Value: !Sub "${SenzingLicenseAsBase64}"
           Essential: true
-          Image: senzing/init-container:1.6.4
+          Image: public.ecr.aws/d5v4a2g3/init-container:1.6.5
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3143,7 +3136,7 @@ Resources:
               Name: SENZING_ACCEPT_EULA
               Value: !Ref AcceptEula
           Essential: true
-          Image: senzing/yum:1.1.3
+          Image: public.ecr.aws/d5v4a2g3/yum:1.1.3
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3216,7 +3209,7 @@ Resources:
                   DatabasePortRes: !GetAtt RdsDbClusterRes.Endpoint.Port
                   DatabaseUsername: !FindInMap [Constants, Database, Username]
           Essential: true
-          Image: senzing/jupyter:1.2.0
+          Image: public.ecr.aws/d5v4a2g3/jupyter:1.2.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3327,7 +3320,7 @@ Resources:
               Name: SENZING_SUBCOMMAND
               Value: redo
           Essential: true
-          Image: senzing/redoer:1.3.4
+          Image: public.ecr.aws/d5v4a2g3/redoer:1.3.4
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3405,8 +3398,11 @@ Resources:
             -
               Name: ROOT_PASSWORD
               Value: !GetAtt LambdaRunnerSshPassword.RandomString
+            -
+              Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
+              Value: 'true'
           Essential: true
-          Image: senzing/sshd:1.0.3
+          Image: public.ecr.aws/d5v4a2g3/sshd:1.0.3
           LinuxParameters:
             Capabilities:
               Add:
@@ -3534,7 +3530,7 @@ Resources:
               Name: SENZING_THREADS_PER_PROCESS
               Value: '8'
           Essential: true
-          Image: senzing/stream-loader:1.6.5
+          Image: public.ecr.aws/d5v4a2g3/stream-loader:1.7.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3637,13 +3633,18 @@ Resources:
               Name: SENZING_THREADS_PER_PRINT
               Value: '30'
           Essential: true
-          Image: senzing/stream-producer:1.2.3
+          Image: public.ecr.aws/d5v4a2g3/stream-producer:1.3.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref LogsLogGroupMain
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: job
+          MountPoints:
+            -
+              SourceVolume: senzing-var-dir
+              ContainerPath: /var/opt/senzing
+              ReadOnly: false
           Name: producer
           Privileged: false
           ReadonlyRootFilesystem: false
@@ -3658,6 +3659,14 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-ecs-task-definition-stream-producer"
       TaskRoleArn: !GetAtt IamRoleStreamProducer.Arn
+      Volumes:
+        -
+          Name: senzing-var-dir
+          EFSVolumeConfiguration:
+              AuthorizationConfig: {}
+              FilesystemId:
+                Ref: EfsFileSystem
+              RootDirectory: /var
     Type: AWS::ECS::TaskDefinition
 
 
@@ -3670,7 +3679,7 @@ Resources:
               Name: URL
               Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
           Essential: true
-          Image: swaggerapi/swagger-ui:latest
+          Image: public.ecr.aws/d5v4a2g3/swagger-ui:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3710,7 +3719,7 @@ Resources:
               Name: SENZING_WEB_SERVER_PORT
               Value: '8251'
           Essential: true
-          Image: senzing/entity-search-web-app:2.1.1
+          Image: public.ecr.aws/d5v4a2g3/entity-search-web-app:2.2.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3742,8 +3751,12 @@ Resources:
     Properties:
       ContainerDefinitions:
         -
+          Environment:
+            -
+              Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
+              Value: 'true'
           Essential: true
-          Image: senzing/xterm:1.0.3
+          Image: public.ecr.aws/d5v4a2g3/xterm:1.0.3
           LinuxParameters:
             Capabilities:
               Add:
@@ -4081,7 +4094,7 @@ Resources:
       MaxCapacity: 200
       MinCapacity: 1
       ResourceId: !Sub "service/${EcsCluster}/${EcsServiceApiServer.Name}"
-      RoleARN: !GetAtt IamRoleApiServer.Arn
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
       SuspendedState:
@@ -4096,7 +4109,7 @@ Resources:
       MaxCapacity: 200
       MinCapacity: 1
       ResourceId: !Sub "service/${EcsCluster}/${EcsServiceStreamLoader.Name}"
-      RoleARN: !GetAtt IamRoleStreamLoader.Arn
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
       SuspendedState:
@@ -4111,7 +4124,7 @@ Resources:
       MaxCapacity: 200
       MinCapacity: 1
       ResourceId: !Sub "service/${EcsCluster}/${EcsServiceWebApp.Name}"
-      RoleARN: !GetAtt IamRoleWebApp.Arn
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
       SuspendedState:
@@ -4170,67 +4183,66 @@ Resources:
 
 Outputs:
 
-  ApiServerHeartbeatUrl:
-    Condition: IfRunApiServer
-    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs/#apiserverheartbeaturl'
-    Value: !Sub "http://${LoadBalancerPublic.DNSName}:8250/heartbeat"
+  AccountID:
+    Description: 'The accountID'
+    Value: !Sub "${AWS::AccountId}"
 
   DatabaseHostCore:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostcore'
+    Description: 'The connection endpoint for the DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databasehostcore'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-core"
     Value: !GetAtt RdsDbClusterCore.Endpoint.Address
 
   DatabaseHostLibfeat:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostlibfeat'
+    Description: 'The connection endpoint for the DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databasehostlibfeat'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-libfeat"
     Value: !GetAtt RdsDbClusterLibfeat.Endpoint.Address
 
   DatabaseHostRes:
-    Description: 'The connection endpoint for the DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasehostres'
+    Description: 'The connection endpoint for the DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databasehostres'
     Export:
       Name: !Sub "${AWS::StackName}-database-host-res"
     Value: !GetAtt RdsDbClusterRes.Endpoint.Address
 
   DatabaseName:
-    Description: 'The name of the database. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasename'
+    Description: 'The name of the database. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databasename'
     Export:
       Name: !Sub "${AWS::StackName}-database-name"
     Value: !FindInMap [Constants, Database, Name]
 
   DatabasePassword:
-    Description: 'The randomly generated password for the database. Help: http://senzing.github.io/aws-cloudformation-ecs/#databasepassword'
+    Description: 'The randomly generated password for the database. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databasepassword'
     Export:
       Name: !Sub "${AWS::StackName}-database-password"
     Value: !GetAtt LambdaRunnerDbPassword.RandomString
 
   DatabasePortCore:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportcore'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databaseportcore'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-core"
     Value: !GetAtt RdsDbClusterCore.Endpoint.Port
 
   DatabasePortLibfeat:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportlibfeat'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databaseportlibfeat'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-libfeat"
     Value: !GetAtt RdsDbClusterLibfeat.Endpoint.Port
 
   DatabasePortRes:
-    Description: 'The port number that will accept connections on this DB cluster. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseportres'
+    Description: 'The port number that will accept connections on this DB cluster. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databaseportres'
     Export:
       Name: !Sub "${AWS::StackName}-database-port-res"
     Value: !GetAtt RdsDbClusterRes.Endpoint.Port
 
   DatabaseUsername:
-    Description: 'The administrative user name. Help: http://senzing.github.io/aws-cloudformation-ecs/#databaseusername'
+    Description: 'The administrative user name. Help: http://hub.senzing.com/aws-cloudformation-ecs/#databaseusername'
     Export:
       Name: !Sub "${AWS::StackName}-database-username"
     Value: !FindInMap [Constants, Database, Username]
 
   Ec2Vpc:
-    Description: 'The ID of the VPC. Help: http://senzing.github.io/aws-cloudformation-ecs/#ec2vpc'
+    Description: 'The ID of the VPC. Help: http://hub.senzing.com/aws-cloudformation-ecs/#ec2vpc'
     Export:
       Name: !Sub "${AWS::StackName}-ec2-VpcId"
     Value: !If
@@ -4239,57 +4251,68 @@ Outputs:
       - !Ref VpcId
 
   Host:
-    Description: 'Host name of public services. Help: http://senzing.github.io/aws-cloudformation-ecs/#host'
+    Description: 'Host name of public services. Help: http://hub.senzing.com/aws-cloudformation-ecs/#host'
     Export:
       Name: !Sub "${AWS::StackName}-host"
     Value: !GetAtt LoadBalancerPublic.DNSName
 
-  JupyterUrl:
-    Condition: IfRunJupyter
-    Description: 'Url for Jupyter Notebooks. Help: http://senzing.github.io/aws-cloudformation-ecs/#jupyterurl'
-    Value: !Sub "http://${LoadBalancerPublic.DNSName}:8888"
-
   Queue:
-    Description: 'URL of the input queue. Help: http://senzing.github.io/aws-cloudformation-ecs/#queue'
+    Description: 'URL of the input queue. Help: http://hub.senzing.com/aws-cloudformation-ecs/#queue'
     Export:
       Name: !Sub "${AWS::StackName}-queue"
     Value: !Ref SqsQueue
 
   QueueDeadLetter:
-    Description: 'URL of the dead-letter queue. Help: http://senzing.github.io/aws-cloudformation-ecs/#queuedeadletter'
+    Description: 'URL of the dead-letter queue. Help: http://hub.senzing.com/aws-cloudformation-ecs/#queuedeadletter'
     Export:
       Name: !Sub "${AWS::StackName}-queue-deadletter"
     Value: !Ref SqsQueueDeadLetter
 
   SshPassword:
-    Description: 'The randomly generated password for SSH access. Help: http://senzing.github.io/aws-cloudformation-ecs/#sshpassword'
+    Description: 'The randomly generated password for SSH access. Help: http://hub.senzing.com/aws-cloudformation-ecs/#sshpassword'
     Export:
       Name: !Sub "${AWS::StackName}-ssh-password"
     Value: !GetAtt LambdaRunnerSshPassword.RandomString
 
+  SshUsername:
+    Description: 'The username for SSH access. Help: http://hub.senzing.com/aws-cloudformation-ecs/#sshusername'
+    Export:
+      Name: !Sub "${AWS::StackName}-ssh-username"
+    Value: root
+
   SubnetPublic1:
-    Description: 'The ID of public subnet 1. Help: http://senzing.github.io/aws-cloudformation-ecs/#subnetpublic1'
+    Description: 'The ID of public subnet 1. Help: http://hub.senzing.com/aws-cloudformation-ecs/#subnetpublic1'
     Export:
       Name: !Sub "${AWS::StackName}-subnet-public-1"
     Value: !Ref Ec2SubnetPublic1
 
   SubnetPublic2:
-    Description: 'The ID of public subnet 2. Help: http://senzing.github.io/aws-cloudformation-ecs/#subnetpublic2'
+    Description: 'The ID of public subnet 2. Help: http://hub.senzing.com/aws-cloudformation-ecs/#subnetpublic2'
     Export:
       Name: !Sub "${AWS::StackName}-subnet-public-2"
     Value: !Ref Ec2SubnetPublic2
 
-  SwaggerUrl:
+  UrlApiServerHeartbeat:
+    Condition: IfRunApiServer
+    Description: "URL for API Server's heartbeat. Help: http://hub.senzing.com/aws-cloudformation-ecs/#urlapiserverheartbeat"
+    Value: !Sub "http://${LoadBalancerPublic.DNSName}:8250/heartbeat"
+
+  UrlJupyter:
+    Condition: IfRunJupyter
+    Description: 'URL for Jupyter Notebooks. Help: http://hub.senzing.com/aws-cloudformation-ecs/#urljupyter'
+    Value: !Sub "http://${LoadBalancerPublic.DNSName}:8888"
+
+  UrlSwagger:
     Condition: IfRunSwagger
-    Description: 'Url for Swagger. Help: http://senzing.github.io/aws-cloudformation-ecs/#swaggerurl'
+    Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs/#urlswagger'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
 
-  WebAppUrl:
+  UrlWebApp:
     Condition: IfRunWebApp
-    Description: 'Url for Senzing Web App. Help: http://senzing.github.io/aws-cloudformation-ecs/#webappurl'
+    Description: 'URL for Senzing Web App. Help: http://hub.senzing.com/aws-cloudformation-ecs/#urlwebapp'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8251"
 
-  XtermUrl:
+  UrlXterm:
     Condition: IfRunXterm
-    Description: 'Url for Senzing X-Term. Help: http://senzing.github.io/aws-cloudformation-ecs/#xtermurl'
+    Description: 'URL for Senzing X-Term. Help: http://hub.senzing.com/aws-cloudformation-ecs/#urlxterm'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:5000"
