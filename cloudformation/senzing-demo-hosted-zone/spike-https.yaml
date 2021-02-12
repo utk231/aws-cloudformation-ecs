@@ -98,6 +98,7 @@ Resources:
               Service:
                 - ecs-tasks.amazonaws.com
                 - lambda.amazonaws.com
+                - route53.amazonaws.com
                 - sqs.amazonaws.com
         Version: '2012-10-17'
       Description: !Sub "${AWS::StackName}-iam-role-lambda"
@@ -161,6 +162,23 @@ Resources:
       Roles:
        - !Ref IamRoleLambda
        - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyRoute53:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-route53"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - route53:GetHostedZone
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
     Type: AWS::IAM::Policy
 
 # -- Logging ------------------------------------------------------------------
@@ -374,7 +392,7 @@ Resources:
               finally:
                   cfnresponse.send(event, context, result, {})
 
-      Description: Runs an ECS task.
+      Description: Gets Route53 hosted zone information.
       FunctionName: !Sub "${AWS::StackName}-lambda-find-domain-name"
       Handler: index.handler
       Role: !GetAtt IamRoleLambda.Arn
