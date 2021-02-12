@@ -39,7 +39,7 @@ Parameters:
 
   CertificateArn:
     Type: String
-    Description: The ARN of the SSL/TLS certificate for ALB port 443 listener
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
     Default: arn:aws:acm:us-east-1:488776654093:certificate/cb714c71-f17c-446b-89cb-a90bb4b3b193
 
   CidrInbound:
@@ -230,7 +230,7 @@ Resources:
       FromPort: 8080
       GroupId: !Ref Ec2SecurityGroupLoadBalancerPublic
       IpProtocol: tcp
-      ToPort: 8080
+      ToPort: 8081
     Type: AWS::EC2::SecurityGroupIngress
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
@@ -344,7 +344,17 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
 
-  ListenerSwagger:
+  ListenerSwaggerHttp:
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerPublic
+      Port: 8080
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+  ListenerSwaggerHttps:
     Properties:
       Certificates:
         - CertificateArn: !Ref CertificateArn
@@ -352,13 +362,14 @@ Resources:
         - TargetGroupArn: !Ref TargetGroupSwagger
           Type: forward
       LoadBalancerArn: !Ref LoadBalancerPublic
-      Port: 8080
+      Port: 8081
       Protocol: HTTPS
     Type: AWS::ElasticLoadBalancingV2::Listener
 
 # -- Route53RecordSet ---------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
+# FIXME: Fix Name.
 
   Route53RecordSet:
     Properties:
@@ -414,14 +425,14 @@ Resources:
       TaskRoleArn: !GetAtt IamRoleSwagger.Arn
     Type: AWS::ECS::TaskDefinition
 
-
 # -- EcsService ---------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
 
   EcsServiceSwagger:
     DependsOn:
-     - ListenerSwagger
+     - ListenerSwaggerHttp
+     - ListenerSwaggerHttp
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -488,6 +499,10 @@ Outputs:
     Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswagger'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
 
+  UrlSwaggerHttp:
+    Description: 'HTTP URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttp'
+    Value: !Sub "http://${AWS::StackName}.senzing-mjd.com:8080"
+
   UrlSwaggerHttps:
-    Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
-    Value: !Sub "https://${AWS::StackName}.senzing-mjd.com:8080"
+    Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
+    Value: !Sub "https://${AWS::StackName}.senzing-mjd.com:8081"
