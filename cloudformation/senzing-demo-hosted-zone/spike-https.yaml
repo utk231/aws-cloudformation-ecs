@@ -434,8 +434,8 @@ Resources:
                       # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/route53.html
 
                       route53 = boto3.client('route53')
-                      response = route53.get_hosted_zone(Id=hosted_zone_id)
-                      response_data["Response"] = response
+                      hosted_zone_dict = route53.get_hosted_zone(Id=hosted_zone_id)
+                      response["Name"] = hosted_zone_dict.get("HostedZone", {}).get("Name", "")
                   logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
               except Exception as e:
@@ -443,7 +443,7 @@ Resources:
                   traceback.print_exc()
                   result = cfnresponse.FAILED
               finally:
-                  cfnresponse.send(event, context, result, {})
+                  cfnresponse.send(event, context, result, response)
 
       Description: Gets Route53 hosted zone information.
       FunctionName: !Sub "${AWS::StackName}-lambda-find-domain-name"
@@ -680,6 +680,6 @@ Outputs:
     Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
     Value: !Sub "https://${AWS::StackName}.senzing-mjd.com:8081"
 
-  LambdaRunnerFindDomainName:
-    Description: 'The randomly generated password for SSH access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#sshpassword'
-    Value: !GetAtt LambdaRunnerFindDomainName.Response
+  TestLambdaRunnerFindDomainName:
+    Description: 'FIXME: for testing'
+    Value: !GetAtt LambdaRunnerFindDomainName.Name
