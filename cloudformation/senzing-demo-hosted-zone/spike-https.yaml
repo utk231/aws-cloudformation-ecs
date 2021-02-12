@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 # File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
-# Tests:
-#     Lint: https://github.com/aws-cloudformation/cfn-python-lint
-#     Nag: https://github.com/stelligent/cfn_nag
-#     aws cloudformation validate-template: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudformation/validate-template.html
 
 Description: >-
   Senzing aws-cloudformation-ecs-senzing-demo-hosted-zone-spike Version: 0.1.0
@@ -23,8 +19,11 @@ Metadata:
           default: Security
         Parameters:
           - CidrInbound
+          - CertificateArn
           - Route53HostedZoneId
     ParameterLabels:
+      CertificateArn:
+        default: 'Required: ARN of Certificate'
       CidrInbound:
         default: 'Required: Allowed inbound connections using CIDR notation.'
       Route53HostedZoneId:
