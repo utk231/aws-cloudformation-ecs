@@ -168,7 +168,6 @@ Resources:
           Value: !Sub "${AWS::StackName}-iam-role-the-winner"
     Type: AWS::IAM::Role
 
-
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
 
   IamPolicyLoggingCreateStream:
@@ -435,7 +434,9 @@ Resources:
 
                       route53 = boto3.client('route53')
                       hosted_zone_dict = route53.get_hosted_zone(Id=hosted_zone_id)
-                      response["Name"] = hosted_zone_dict.get("HostedZone", {}).get("Name", "")
+                      name = hosted_zone_dict.get("HostedZone", {}).get("Name", " ")
+                      response["Name"] = name
+                      response["DomainName"] = name[:-1]
                   logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
               except Exception as e:
@@ -527,6 +528,7 @@ Resources:
       Protocol: HTTP
     Type: AWS::ElasticLoadBalancingV2::Listener
 
+
   ListenerSwaggerHttps:
     Properties:
       Certificates:
@@ -542,7 +544,6 @@ Resources:
 # -- Route53RecordSet ---------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
-# FIXME: Fix Name.
 
   Route53RecordSet:
     Properties:
@@ -554,7 +555,10 @@ Resources:
         HostedZoneId: !GetAtt LoadBalancerPublic.CanonicalHostedZoneID
       Comment: !Sub "${AWS::StackName} RecordSet"
       HostedZoneId: !Ref Route53HostedZoneId
-      Name: !Sub "${AWS::StackName}.senzing-mjd.com."
+      Name: !Sub
+        - "${StackName}.${DomainName}"
+        - StackName: ${AWS::StackName}
+          DomainName: !GetAtt LambdaRunnerFindDomainName.Name
       Type: A
     Type: AWS::Route53::RecordSet
 
@@ -674,12 +678,12 @@ Outputs:
 
   UrlSwaggerHttp:
     Description: 'HTTP URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttp'
-    Value: !Sub "http://${AWS::StackName}.senzing-mjd.com:8080"
+    Value: !Sub
+      - "http://${AWS::StackName}.${DomainName}:8080"
+      - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
 
   UrlSwaggerHttps:
     Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
-    Value: !Sub "https://${AWS::StackName}.senzing-mjd.com:8081"
-
-  TestLambdaRunnerFindDomainName:
-    Description: 'FIXME: for testing'
-    Value: !GetAtt LambdaRunnerFindDomainName.Name
+    Value: !Sub
+      - "https://${AWS::StackName}.${DomainName}:8081"
+      - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
