@@ -178,8 +178,8 @@ Resources:
         Statement:
           -
             Action:
-              - 'route53:*'
-#             - route53:GetHostedZone
+#             - 'route53:*'
+              - route53:GetHostedZone
 #              "route53:GetHostedZone",
 #              "route53:ListResourceRecordSets",
 #              "route53:ListHostedZones",
