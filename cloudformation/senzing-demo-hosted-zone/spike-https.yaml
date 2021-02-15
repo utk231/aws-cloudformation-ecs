@@ -99,8 +99,6 @@ Resources:
                 - ecs-tasks.amazonaws.com
                 - lambda.amazonaws.com
                 - route53.amazonaws.com
-                - route53domains.amazonaws.com
-                - route53resolver.amazonaws.com
                 - sqs.amazonaws.com
         Version: '2012-10-17'
       Description: !Sub "${AWS::StackName}-iam-role-lambda"
@@ -120,10 +118,7 @@ Resources:
             Principal:
               Service:
                 - ecs-tasks.amazonaws.com
-                - lambda.amazonaws.com
                 - route53.amazonaws.com
-                - route53domains.amazonaws.com
-                - route53resolver.amazonaws.com
         Version: '2012-10-17'
       Description: !Sub "${AWS::StackName}-iam-role-swagger"
       Tags:
@@ -178,15 +173,7 @@ Resources:
         Statement:
           -
             Action:
-#             - 'route53:*'
               - route53:GetHostedZone
-#              "route53:GetHostedZone",
-#              "route53:ListResourceRecordSets",
-#              "route53:ListHostedZones",
-#              "route53:ChangeResourceRecordSets",
-#              "route53:ListResourceRecordSets",
-#              "route53:GetHostedZoneCount",
-#              "route53:ListHostedZonesByName"
             Effect: Allow
             Resource:
               - '*'
