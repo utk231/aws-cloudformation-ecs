@@ -19,11 +19,8 @@ Metadata:
           default: Security
         Parameters:
           - CidrInbound
-          - CertificateArn
           - Route53HostedZoneId
     ParameterLabels:
-      CertificateArn:
-        default: 'Required: ARN of Certificate'
       CidrInbound:
         default: 'Required: Allowed inbound connections using CIDR notation.'
       Route53HostedZoneId:
@@ -35,11 +32,6 @@ Metadata:
 # -----------------------------------------------------------------------------
 
 Parameters:
-
-  CertificateArn:
-    Type: String
-    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
-    Default: arn:aws:acm:us-east-1:488776654093:certificate/cb714c71-f17c-446b-89cb-a90bb4b3b193
 
   CidrInbound:
     AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
@@ -106,6 +98,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-iam-role-lambda"
     Type: AWS::IAM::Role
+
 
   IamRoleSwagger:
     Properties:
@@ -211,6 +204,7 @@ Resources:
         - "/senzing/${StackName}/${AWS::StackName}"
         - StackName: !FindInMap [Constants, Stack, Name]
     Type: AWS::Logs::LogGroup
+
 
   LogsLogGroupLambdaFindDomainName:
     Properties:
@@ -526,7 +520,7 @@ Resources:
   ListenerSwaggerHttps:
     Properties:
       Certificates:
-        - CertificateArn: !Ref CertificateArn
+        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
       DefaultActions:
         - TargetGroupArn: !Ref TargetGroupSwagger
           Type: forward
