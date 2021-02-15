@@ -120,52 +120,15 @@ Resources:
             Principal:
               Service:
                 - ecs-tasks.amazonaws.com
-        Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-swagger"
-      Tags:
-        - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-swagger"
-    Type: AWS::IAM::Role
-
-  IamRoleTheWinner:
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          -
-            Action:
-              - sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
                 - lambda.amazonaws.com
                 - route53.amazonaws.com
                 - route53domains.amazonaws.com
                 - route53resolver.amazonaws.com
         Version: '2012-10-17'
-      Description: !Sub "${AWS::StackName}-iam-role-the-winner"
-      Policies:
-        - PolicyName: Winner
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - 'route53:*'
-                Effect: Allow
-                Resource: '*'
-        - PolicyName: Bobo
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - ecs:DescribeTasks
-                  - ecs:RunTask
-                Effect: Allow
-                Resource:
-                  - '*'
+      Description: !Sub "${AWS::StackName}-iam-role-swagger"
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-iam-role-the-winner"
+          Value: !Sub "${AWS::StackName}-iam-role-swagger"
     Type: AWS::IAM::Role
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
@@ -186,7 +149,6 @@ Resources:
       Roles:
        - !Ref IamRoleLambda
        - !Ref IamRoleSwagger
-       - !Ref IamRoleTheWinner
     Type: AWS::IAM::Policy
 
 
@@ -216,7 +178,7 @@ Resources:
         Statement:
           -
             Action:
-              - route53:'*'
+              - 'route53:*'
 #             - route53:GetHostedZone
 #              "route53:GetHostedZone",
 #              "route53:ListResourceRecordSets",
@@ -231,6 +193,7 @@ Resources:
         Version: '2012-10-17'
       Roles:
        - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
 # -- Logging ------------------------------------------------------------------
@@ -399,6 +362,8 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
   LambdaFunctionFindDomainName:
+    DependsOn:
+     - IamPolicyRoute53
     Properties:
       Code:
         ZipFile: |
@@ -449,7 +414,7 @@ Resources:
       Description: Gets Route53 hosted zone information.
       FunctionName: !Sub "${AWS::StackName}-lambda-find-domain-name"
       Handler: index.handler
-      Role: !GetAtt IamRoleTheWinner.Arn
+      Role: !GetAtt IamRoleLambda.Arn
       Runtime: python3.8
       Tags:
         - Key: Name
