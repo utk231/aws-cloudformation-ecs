@@ -183,6 +183,24 @@ Resources:
        - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
+
+  IamPolicyCertificateManager:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-certificate-manager"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - acm:ListCertificates
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
 # -- Logging ------------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
@@ -372,6 +390,13 @@ Resources:
                   if isinstance(obj, (datetime.date, datetime.datetime)):
                       return obj.isoformat()
 
+          def find_certificate_arn(certificate_domain_name, certificate_list):
+              certificate_summary_list = certificate_list.get('CertificateSummaryList', [])
+              for certificate_summary in certificate_summary_list:
+                  if certificate_summary.get('DomainName') == certificate_domain_name:
+                     return certificate_summary.get('CertificateArn')
+              return ""
+
           def handler(event, context):
               result = cfnresponse.SUCCESS
               response = {}
@@ -381,7 +406,7 @@ Resources:
                       properties = event.get('ResourceProperties', {})
                       hosted_zone_id = properties.get('HostedZoneId', {})
 
-                      # Make AWS ECS request.
+                      # Find domain in AWS Route53
                       # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/route53.html
 
                       route53 = boto3.client('route53')
@@ -389,6 +414,23 @@ Resources:
                       name = hosted_zone_dict.get("HostedZone", {}).get("Name", " ")
                       response["Name"] = name
                       response["DomainName"] = name[:-1]
+
+                      # Find Certificate in AWS Certificate Manager
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/acm.html
+
+                      certificate_domain_name = "*.{0}".format(response["DomainName"])
+                      logger.info("domain_name = {0}".format(certificate_domain_name))
+
+                      acm_client = boto3.client('acm')
+                      certificate_list = acm_client.list_certificates()
+                      certificate_arn = find_certificate_arn(certificate_domain_name, certificate_list)
+                      response["CertificateArn"] = certificate_arn
+                      logger.info("certificate_arn = {0}".format(certificate_arn))
+
+                      if not certificate_arn:
+                          logger.warning("Cannot find certificate for '{0}'".format(certificate_domain_name))
+                          result = cfnresponse.FAILED
+
                   logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
 
               except Exception as e:
@@ -599,6 +641,10 @@ Outputs:
   AccountID:
     Description: 'The accountID'
     Value: !Sub "${AWS::AccountId}"
+
+  CertificateArn:
+    Description: 'ARN of the SSL certificate. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
+    Value: !GetAtt LambdaRunnerFindDomainName.CertificateArn
 
   Ec2Vpc:
     Description: 'The ID of the VPC. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#ec2vpc'
