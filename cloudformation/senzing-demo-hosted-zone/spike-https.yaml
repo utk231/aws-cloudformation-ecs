@@ -41,6 +41,7 @@ Parameters:
     Type: String
 
   Route53HostedZoneId:
+    Default: ''
     Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#route53hostedzoneid'
     Type: AWS::Route53::HostedZone::Id
 
@@ -66,6 +67,18 @@ Mappings:
       cidr: 10.0.3.0/24
     privsubnet2:
       cidr: 10.0.4.0/24
+
+# -----------------------------------------------------------------------------
+# Conditions
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html
+# -----------------------------------------------------------------------------
+
+Conditions:
+
+  IfRoute53HostedZoneId: !Not
+    - !Equals
+      - !Ref Route53HostedZoneId
+      - ''
 
 # -----------------------------------------------------------------------------
 # Resources
@@ -207,6 +220,7 @@ Resources:
 
 
   LogsLogGroupLambdaFindDomainName:
+    Condition: IfRoute53HostedZoneId
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-find-domain-name"
     Type: AWS::Logs::LogGroup
@@ -361,6 +375,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
   LambdaFunctionFindDomainName:
+    Condition: IfRoute53HostedZoneId
     DependsOn:
      - IamPolicyRoute53
     Properties:
@@ -451,6 +466,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
 
   LambdaRunnerFindDomainName:
+    Condition: IfRoute53HostedZoneId
     Properties:
       ClusterId: !Ref EcsCluster
       HostedZoneId: !Ref Route53HostedZoneId
@@ -518,6 +534,7 @@ Resources:
 
 
   ListenerSwaggerHttps:
+    Condition: IfRoute53HostedZoneId
     Properties:
       Certificates:
         - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
@@ -534,6 +551,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
 
   Route53RecordSet:
+    Condition: IfRoute53HostedZoneId
     Properties:
       AliasTarget:
         DNSName: !Sub
@@ -597,7 +615,6 @@ Resources:
   EcsServiceSwagger:
     DependsOn:
      - ListenerSwaggerHttp
-     - ListenerSwaggerHttp
     Properties:
       Cluster: !Ref EcsCluster
       DesiredCount: 1
@@ -637,6 +654,7 @@ Outputs:
     Value: !Sub "${AWS::AccountId}"
 
   CertificateArn:
+    Condition: IfRoute53HostedZoneId
     Description: 'ARN of the SSL certificate. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
     Value: !GetAtt LambdaRunnerFindDomainName.CertificateArn
 
@@ -669,12 +687,14 @@ Outputs:
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
 
   UrlSwaggerHttp:
+    Condition: IfRoute53HostedZoneId
     Description: 'HTTP URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttp'
     Value: !Sub
       - "http://${AWS::StackName}.${DomainName}:8080"
       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
 
   UrlSwaggerHttps:
+    Condition: IfRoute53HostedZoneId
     Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
     Value: !Sub
       - "https://${AWS::StackName}.${DomainName}:8081"
