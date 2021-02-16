@@ -22,7 +22,7 @@ The `aws-cloudformation-ecs / staging-test` is used for testing a version of Sen
         1. Select the [staging-test/cloudformation.yaml](https://github.com/Senzing/aws-cloudformation-ecs/blob/main/cloudformation/staging-test/cloudformation.yaml) file on your local system.
            Example: `~/senzing.git/aws-cloudformation-ecs/cloudformation/staging-test/cloudformation.yaml`
     1. In lower-right, click on "Next" button.
-1. In **Specify stack details"**
+1. In **Specify stack details**
     1. In **Stack name**
         1. Start stack name with your initials.
            Example: `mjd-4001`
@@ -54,4 +54,9 @@ The `aws-cloudformation-ecs / staging-test` is used for testing a version of Sen
     1. May have to hit the refresh button a few times to get updated information.
 1. Click on "{stack-name}" stack
 1. Click on "Outputs" tab
-1. Click on "WebAppUrl" value
+1. Click on URLs:
+    1. UrlApiServerHeartbeat
+    1. UrlJupyter
+    1. UrlSwagger
+    1. UrlWebApp
+    1. UrlXterm
