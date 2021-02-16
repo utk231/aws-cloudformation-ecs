@@ -563,7 +563,7 @@ Resources:
               Name: URL
               Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/swagger-ui:latest
+          Image: public.ecr.aws/senzing/swagger-ui:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:

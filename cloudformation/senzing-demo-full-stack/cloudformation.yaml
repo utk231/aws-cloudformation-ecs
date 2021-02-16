@@ -2749,7 +2749,7 @@ Resources:
             - '*'
             - -enableAdmin
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/senzing-api-server:2.3.1
+          Image: public.ecr.aws/senzing/senzing-api-server:2.3.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2850,7 +2850,7 @@ Resources:
             - '-p'
             - '/efs/var/shared'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/busybox
+          Image: public.ecr.aws/senzing/busybox
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2902,7 +2902,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
+          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2954,7 +2954,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
+          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3006,7 +3006,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/postgresql-client:1.0.0
+          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3064,7 +3064,7 @@ Resources:
               Name: SENZING_LICENSE_BASE64_ENCODED
               Value: !Sub "${SenzingLicenseAsBase64}"
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/init-container:1.6.5
+          Image: public.ecr.aws/senzing/init-container:1.6.5
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3136,7 +3136,7 @@ Resources:
               Name: SENZING_ACCEPT_EULA
               Value: !Ref AcceptEula
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/yum:1.1.3
+          Image: public.ecr.aws/senzing/yum:1.1.3
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3209,7 +3209,7 @@ Resources:
                   DatabasePortRes: !GetAtt RdsDbClusterRes.Endpoint.Port
                   DatabaseUsername: !FindInMap [Constants, Database, Username]
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/jupyter:1.2.0
+          Image: public.ecr.aws/senzing/jupyter:1.2.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3320,7 +3320,7 @@ Resources:
               Name: SENZING_SUBCOMMAND
               Value: redo
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/redoer:1.3.4
+          Image: public.ecr.aws/senzing/redoer:1.3.4
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3402,7 +3402,7 @@ Resources:
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
               Value: 'true'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/sshd:1.0.3
+          Image: public.ecr.aws/senzing/sshd:1.0.3
           LinuxParameters:
             Capabilities:
               Add:
@@ -3530,7 +3530,7 @@ Resources:
               Name: SENZING_THREADS_PER_PROCESS
               Value: '8'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/stream-loader:1.7.0
+          Image: public.ecr.aws/senzing/stream-loader:1.7.0
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3633,7 +3633,7 @@ Resources:
               Name: SENZING_THREADS_PER_PRINT
               Value: '30'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/stream-producer:1.3.1
+          Image: public.ecr.aws/senzing/stream-producer:1.3.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3679,7 +3679,7 @@ Resources:
               Name: URL
               Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/swagger-ui:latest
+          Image: public.ecr.aws/senzing/swagger-ui:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3719,7 +3719,7 @@ Resources:
               Name: SENZING_WEB_SERVER_PORT
               Value: '8251'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/entity-search-web-app:2.2.1
+          Image: public.ecr.aws/senzing/entity-search-web-app:2.2.1
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3756,7 +3756,7 @@ Resources:
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
               Value: 'true'
           Essential: true
-          Image: public.ecr.aws/d5v4a2g3/xterm:1.0.3
+          Image: public.ecr.aws/senzing/xterm:1.0.3
           LinuxParameters:
             Capabilities:
               Add:
