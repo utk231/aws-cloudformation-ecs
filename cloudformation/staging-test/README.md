@@ -31,6 +31,12 @@ The `aws-cloudformation-ecs / staging-test` is used for testing a version of Sen
             1. Accept the End User Licence Agreement
     1. In **Testing**
         1. Enter the name of the package on the staging server for Yum to install.
+        1. To find packages on staging server, run:
+
+            ```console
+            docker run senzing/yum-staging --showduplicate list senzingapi
+            ```
+
     1. Other parameters are optional.
     1. In lower-right, click "Next" button.
 1. In **Configure stack options**
