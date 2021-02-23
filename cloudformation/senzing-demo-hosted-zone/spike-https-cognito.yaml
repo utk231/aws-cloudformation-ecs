@@ -18,9 +18,12 @@ Metadata:
         Label:
           default: Security
         Parameters:
+          - CognitoAdminEmail
           - CidrInbound
           - Route53HostedZoneId
     ParameterLabels:
+      CognitoAdminEmail:
+        default: 'Required: Email address for initial user.'
       CidrInbound:
         default: 'Required: Allowed inbound connections using CIDR notation.'
       Route53HostedZoneId:
@@ -32,6 +35,10 @@ Metadata:
 # -----------------------------------------------------------------------------
 
 Parameters:
+
+  CognitoAdminEmail:
+    Type: String
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#cognitoadminemail'
 
   CidrInbound:
     AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
@@ -568,27 +575,27 @@ Resources:
       Protocol: HTTPS
     Type: AWS::ElasticLoadBalancingV2::Listener
 
-  ListenerSwaggerHttps443:
-    Condition: IfRoute53HostedZoneId
-    Properties:
-      Certificates:
-        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
-      DefaultActions:
-        - AuthenticateCognitoConfig:
-            OnUnauthenticatedRequest: authenticate
-            Scope: openid
-            UserPoolArn: !GetAtt UserPool.Arn
-            UserPoolClientId: !Ref UserPoolClient
-            UserPoolDomain: !Ref UserPoolDomain
-          Order: 1
-          Type: authenticate-cognito
-        - Order: 2
-          TargetGroupArn: !Ref TargetGroupSwagger
-          Type: forward
-      LoadBalancerArn: !Ref LoadBalancerPublic
-      Port: 443
-      Protocol: HTTPS
-    Type: AWS::ElasticLoadBalancingV2::Listener
+# ListenerSwaggerHttps443:
+#   Condition: IfRoute53HostedZoneId
+#   Properties:
+#     Certificates:
+#       - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+#     DefaultActions:
+#       - AuthenticateCognitoConfig:
+#           OnUnauthenticatedRequest: authenticate
+#           Scope: openid
+#           UserPoolArn: !GetAtt 'UserPool.Arn'
+#           UserPoolClientId: !Ref UserPoolClient
+#           UserPoolDomain: !Ref UserPoolDomain
+#         Order: 1
+#         Type: authenticate-cognito
+#       - Order: 2
+#         TargetGroupArn: !Ref TargetGroupSwagger
+#         Type: forward
+#     LoadBalancerArn: !Ref LoadBalancerPublic
+#     Port: 443
+#     Protocol: HTTPS
+#   Type: AWS::ElasticLoadBalancingV2::Listener
 
 # -- Route53RecordSet ---------------------------------------------------------
 
@@ -621,13 +628,24 @@ Resources:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
         InviteMessageTemplate:
-          EmailMessage: 'Use the username {username} and the temporary password {####} to log in for the first time.'
-          EmailSubject: !Sub '${AWS::StackName}: temporary password'
+          EmailMessage: !Sub
+            - |
+              To log into https://${AWS::StackName}.${DomainName}:8081
+
+              Use these temporary credentials:
+                 Username:  {username}\n
+                 Password:  {####}\\n
+
+              You will be prompted to change your password.
+              This temporary password is valid for three weeks.
+            - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+
+          EmailSubject: !Sub 'Temporary password for AWS ${AWS::StackName} stack'
           SMSMessage: 'Use the username {username} and the temporary password {####} to log in for the first time.'
       AutoVerifiedAttributes:
         - email
       Policies:
-        PasswordPolicy: #secure password policy
+        PasswordPolicy:
           MinimumLength: 16
           RequireLowercase: true
           RequireNumbers: true
@@ -644,7 +662,9 @@ Resources:
 
   UserPoolDomain: # Provides Cognito Login Page
     Properties:
-#     Domain: !Sub "${AWS::StackName}"
+#     Domain: !Sub
+#       - "${AWS::StackName}.${DomainName}"
+#       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
       Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']] # Generates a unique domain name
       UserPoolId: !Ref UserPool
     Type: AWS::Cognito::UserPoolDomain
@@ -661,12 +681,30 @@ Resources:
       AllowedOAuthScopes:
         - openid
       CallbackURLs:
-        - !Sub https://${LoadBalancerPublic.DNSName}/oauth2/idpresponse # Redirects to the ALB
+        - !Sub
+          - "https://${AWS::StackName}.${DomainName}/oauth2/idpresponse"
+          - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
       GenerateSecret: true
       SupportedIdentityProviders: # Optional: add providers for identity federation
         - COGNITO
       UserPoolId: !Ref UserPool
     Type: AWS::Cognito::UserPoolClient
+
+# -- UserPoolUser -------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooluser.html
+
+  CognitoUserPoolAdmin:
+    Properties:
+      DesiredDeliveryMediums:
+        - EMAIL
+      UserAttributes:
+        - Name: email
+          Value: !Ref CognitoAdminEmail
+      Username: !Ref CognitoAdminEmail
+      UserPoolId: !Ref UserPool
+    Type: AWS::Cognito::UserPoolUser
+
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -799,3 +837,6 @@ Outputs:
     Value: !Sub
       - "https://${AWS::StackName}.${DomainName}:8081"
       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+
+  XxBob:
+    Value: !Select [2, !Split ['/', !Ref 'AWS::StackId']]
