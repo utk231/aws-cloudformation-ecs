@@ -1,6 +1,17 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: An example CloudFormation template for aws cognito with an alb and a fargate backend.
+Description: An example CloudFormation template for aws cognito with an alb, fargate backend and cognito
 Parameters:
+  CognitoAdminEmail:
+    Type: String
+  DomainName:
+    Type: String
+  CertificateArn:
+    Default: ''
+    Type: String
+  Route53HostedZoneId:
+    Default: ''
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#route53hostedzoneid'
+    Type: AWS::Route53::HostedZone::Id
   VPC:
     Type: AWS::EC2::VPC::Id
   SubnetA:
@@ -14,7 +25,7 @@ Parameters:
   ServiceName:
     Type: String
     # update with the name of the service
-    Default: MyService
+    Default: senzingtest
   ContainerPort:
     Type: Number
     Default: 80
@@ -36,9 +47,7 @@ Parameters:
   AutoScalingTargetValue:
     Type: Number
     Default: 50
-  # the IAM server certificate ARN
-  CertificateArn:
-    Type: String
+    
 Resources:
   Cluster:
     Type: AWS::ECS::Cluster
@@ -288,13 +297,43 @@ Resources:
       AllowedOAuthFlowsUserPoolClient: true # Required for ALB authentication
       AllowedOAuthScopes:
       - openid
+      - email
       CallbackURLs:
-      - !Sub https://${LoadBalancer.DNSName}/oauth2/idpresponse # Redirects to the ALB
+      - !Sub https://${DomainName}/oauth2/idpresponse # Redirects to the ALB
       GenerateSecret: true
       SupportedIdentityProviders: # Optional: add providers for identity federation
       - COGNITO
       UserPoolId: !Ref UserPool
+  CognitoUserPoolAdmin:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: !Ref CognitoAdminEmail
+      DesiredDeliveryMediums:
+        - EMAIL
+      UserPoolId: !Ref UserPool
+      UserAttributes:
+        - Name: email
+          Value: !Ref CognitoAdminEmail
+
+# -- Route53RecordSet ---------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
+
+  Route53RecordSet:
+    Properties:
+      AliasTarget:
+        DNSName: !Sub
+          - "dualstack.${LoadBalancerDNSName}"
+          - LoadBalancerDNSName: !GetAtt LoadBalancer.DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+      Comment: !Sub "${ServiceName} RecordSet"
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+    Type: AWS::Route53::RecordSet
+
 Outputs:
   Endpoint:
     Description: Endpoint
-    Value: !GetAtt LoadBalancer.DNSName
+    Value: !Sub https://${DomainName}
