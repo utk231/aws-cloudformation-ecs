@@ -568,6 +568,28 @@ Resources:
       Protocol: HTTPS
     Type: AWS::ElasticLoadBalancingV2::Listener
 
+  ListenerSwaggerHttps443:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      Certificates:
+        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+      DefaultActions:
+        - AuthenticateCognitoConfig:
+            OnUnauthenticatedRequest: authenticate
+            Scope: openid
+            UserPoolArn: !GetAtt UserPool.Arn
+            UserPoolClientId: !Ref UserPoolClient
+            UserPoolDomain: !Ref UserPoolDomain
+          Order: 1
+          Type: authenticate-cognito
+        - Order: 2
+          TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerPublic
+      Port: 443
+      Protocol: HTTPS
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
 # -- Route53RecordSet ---------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
@@ -622,7 +644,8 @@ Resources:
 
   UserPoolDomain: # Provides Cognito Login Page
     Properties:
-      Domain: !Sub "${AWS::StackName}"
+#     Domain: !Sub "${AWS::StackName}"
+      Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']] # Generates a unique domain name
       UserPoolId: !Ref UserPool
     Type: AWS::Cognito::UserPoolDomain
 
