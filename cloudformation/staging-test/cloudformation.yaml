@@ -7,7 +7,8 @@ AWSTemplateFormatVersion: 2010-09-09
 #     aws cloudformation validate-template: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudformation/validate-template.html
 
 Description: >-
-  Senzing aws-cloudformation-ecs Version: 0.1.0
+  Senzing aws-cloudformation-ecs/staging-test Version: 0.1.0
+  This CloudFormation is a test of code on the Senzing Staging server.
   For more information see https://github.com/Senzing/aws-cloudformation-ecs
 
 # -----------------------------------------------------------------------------
@@ -29,6 +30,11 @@ Metadata:
           default: Security
         Parameters:
           - CidrInbound
+      -
+        Label:
+          default: Testing
+        Parameters:
+          - SenzingVersion
       -
         Label:
           default: 'Optional: Identify existing resources'
@@ -104,6 +110,9 @@ Metadata:
           Required if running stream-producer job.
           First record to read from file of JSON records.
           '0' means start from the beginning.
+      SenzingVersion:
+        default: >-
+          The version of Senzing on the staging server to be tested.
       VpcAvailabilityZones:
         default: >-
           Required if specifying existing VPC.
@@ -236,6 +245,11 @@ Parameters:
     Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingrecordmin'
     Type: Number
 
+  SenzingVersion:
+    Default: senzingapi-M.m.P-nnnnn
+    Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#senzingversion'
+    Type: String
+
   VpcAvailabilityZones:
     Default: ''
     Description: 'Help: http://senzing.github.io/aws-cloudformation-ecs/senzing-demo-full-stack#vpcavailabilityzones'
@@ -280,7 +294,7 @@ Mappings:
       Name: G2
       Username: senzing
     Stack:
-      Name: experimental
+      Name: staging-test
 
   VpcCidrs:
     vpc:
@@ -2749,7 +2763,7 @@ Resources:
             - '*'
             - -enableAdmin
           Essential: true
-          Image: public.ecr.aws/senzing/senzing-api-server:2.3.1
+          Image: senzing/senzing-api-server:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2850,7 +2864,7 @@ Resources:
             - '-p'
             - '/efs/var/shared'
           Essential: true
-          Image: public.ecr.aws/senzing/busybox
+          Image: busybox
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2902,7 +2916,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
+          Image: senzing/postgresql-client:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -2954,7 +2968,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
+          Image: senzing/postgresql-client:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3006,7 +3020,7 @@ Resources:
               Name: SENZING_SQL_FILE
               Value: /opt/senzing/g2/resources/schema/g2core-schema-postgresql-create.sql
           Essential: true
-          Image: public.ecr.aws/senzing/postgresql-client:1.0.0
+          Image: senzing/postgresql-client:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3064,7 +3078,7 @@ Resources:
               Name: SENZING_LICENSE_BASE64_ENCODED
               Value: !Sub "${SenzingLicenseAsBase64}"
           Essential: true
-          Image: public.ecr.aws/senzing/init-container:1.6.5
+          Image: senzing/init-container:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3130,13 +3144,13 @@ Resources:
           Command:
             - '-y'
             - 'install'
-            - 'senzingapi-2.3.0-20342'
+            - !Ref SenzingVersion
           Environment:
             -
               Name: SENZING_ACCEPT_EULA
               Value: !Ref AcceptEula
           Essential: true
-          Image: public.ecr.aws/senzing/yum:1.1.3
+          Image: senzing/yum-staging:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3209,7 +3223,7 @@ Resources:
                   DatabasePortRes: !GetAtt RdsDbClusterRes.Endpoint.Port
                   DatabaseUsername: !FindInMap [Constants, Database, Username]
           Essential: true
-          Image: public.ecr.aws/senzing/jupyter:1.2.0
+          Image: senzing/jupyter:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3320,7 +3334,7 @@ Resources:
               Name: SENZING_SUBCOMMAND
               Value: redo
           Essential: true
-          Image: public.ecr.aws/senzing/redoer:1.3.4
+          Image: senzing/redoer:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3402,7 +3416,7 @@ Resources:
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
               Value: 'true'
           Essential: true
-          Image: public.ecr.aws/senzing/sshd:1.0.3
+          Image: senzing/sshd:latest
           LinuxParameters:
             Capabilities:
               Add:
@@ -3530,7 +3544,7 @@ Resources:
               Name: SENZING_THREADS_PER_PROCESS
               Value: '8'
           Essential: true
-          Image: public.ecr.aws/senzing/stream-loader:1.7.0
+          Image: senzing/stream-loader:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3633,7 +3647,7 @@ Resources:
               Name: SENZING_THREADS_PER_PRINT
               Value: '30'
           Essential: true
-          Image: public.ecr.aws/senzing/stream-producer:1.3.1
+          Image: senzing/stream-producer:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3679,7 +3693,7 @@ Resources:
               Name: URL
               Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
           Essential: true
-          Image: public.ecr.aws/senzing/swagger-ui:latest
+          Image: swaggerapi/swagger-ui:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3719,7 +3733,7 @@ Resources:
               Name: SENZING_WEB_SERVER_PORT
               Value: '8251'
           Essential: true
-          Image: public.ecr.aws/senzing/entity-search-web-app:2.2.1
+          Image: senzing/entity-search-web-app:latest
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -3756,7 +3770,7 @@ Resources:
               Name: SENZING_SKIP_DATABASE_PERFORMANCE_TEST
               Value: 'true'
           Essential: true
-          Image: public.ecr.aws/senzing/xterm:1.0.3
+          Image: senzing/xterm:latest
           LinuxParameters:
             Capabilities:
               Add:
