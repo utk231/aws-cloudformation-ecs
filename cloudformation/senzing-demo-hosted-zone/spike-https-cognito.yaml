@@ -336,6 +336,18 @@ Resources:
       ToPort: 8081
     Type: AWS::EC2::SecurityGroupIngress
 
+
+  Ec2SecurityGroupHttps:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      CidrIp: !Ref CidrInbound
+      Description: HTTPS
+      FromPort: 443
+      GroupId: !Ref Ec2SecurityGroupLoadBalancerPublic
+      IpProtocol: tcp
+      ToPort: 443
+    Type: AWS::EC2::SecurityGroupIngress
+
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
 
   Ec2InternetGateway:
@@ -867,21 +879,6 @@ Resources:
       UserPoolId: !Ref UserPool
     Type: AWS::Cognito::UserPoolClient
 
-# -- UserPoolUser -------------------------------------------------------------
-
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooluser.html
-
-# UserPoolUser:
-#   Properties:
-#     DesiredDeliveryMediums:
-#       - EMAIL
-#     UserAttributes:
-#       - Name: email
-#         Value: !Ref CognitoAdminEmail
-#     Username: !Ref CognitoAdminEmail
-#     UserPoolId: !Ref UserPool
-#   Type: AWS::Cognito::UserPoolUser
-
 # -- EcsTaskDefinition --------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
@@ -970,6 +967,8 @@ Outputs:
   CertificateArn:
     Condition: IfRoute53HostedZoneId
     Description: 'ARN of the SSL certificate. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
+    Export:
+      Name: !Sub "${AWS::StackName}-certificate-arn"
     Value: !GetAtt LambdaRunnerFindDomainName.CertificateArn
 
   Ec2Vpc:
@@ -996,14 +995,6 @@ Outputs:
       Name: !Sub "${AWS::StackName}-subnet-public-2"
     Value: !Ref Ec2SubnetPublic2
 
-  WebPassword:
-    Description: 'Temporary password for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webpassword'
-    Value: !GetAtt LambdaRunnerWebPassword.RandomPassword
-
-  WebUsername:
-    Description: 'Username for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webusername'
-    Value: !Ref CognitoAdminEmail
-
   UrlSwagger:
     Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswagger'
     Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
@@ -1022,5 +1013,10 @@ Outputs:
       - "https://${AWS::StackName}.${DomainName}:8081"
       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
 
-  XxBob:
-    Value: !Select [2, !Split ['/', !Ref 'AWS::StackId']]
+  WebPassword:
+    Description: 'Temporary password for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webpassword'
+    Value: !GetAtt LambdaRunnerWebPassword.RandomPassword
+
+  WebUsername:
+    Description: 'Username for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webusername'
+    Value: !Ref CognitoAdminEmail
