@@ -214,6 +214,23 @@ Resources:
        - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
+  IamPolicyCognito:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-cognito"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - cognito-idp:AdminCreateUser
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
 # -- Logging ------------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
@@ -223,6 +240,13 @@ Resources:
       LogGroupName: !Sub
         - "/senzing/${StackName}/${AWS::StackName}"
         - StackName: !FindInMap [Constants, Stack, Name]
+    Type: AWS::Logs::LogGroup
+
+
+  LogsLogGroupLambdaCognitoCreateUser:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-cognito-create-user"
     Type: AWS::Logs::LogGroup
 
 
@@ -381,6 +405,74 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
 
+  LambdaFunctionCognitoCreateUser:
+    Condition: IfRoute53HostedZoneId
+    DependsOn:
+     - IamPolicyRoute53
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import cfnresponse
+          import datetime
+          import json
+          import logging
+          import traceback
+          from json import JSONEncoder
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          class DateTimeEncoder(JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, (datetime.date, datetime.datetime)):
+                      return obj.isoformat()
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      user_pool_id = properties.get('UserPoolId', '')
+                      username = properties.get('WebUsername', '')
+                      password = properties.get('WebPassword', '')
+
+                      # Create Cognito
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/cognito-idp.html
+
+                      cognito = boto3.client('cognito-idp')
+                      admin_create_user_response = cognito.admin_create_user(
+                         UserPoolId=user_pool_id,
+                         Username=username,
+                         TemporaryPassword=password,
+                      )
+
+                      logger.info("admin_create_user_response = {0}".format(admin_create_user_response))
+                  logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
+
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, response)
+
+      Description: Create user.
+      FunctionName: !Sub "${AWS::StackName}-lambda-cognito-create-user"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-cognito-create-user"
+      Timeout: 30
+    Type: AWS::Lambda::Function
+
+
   LambdaFunctionFindDomainName:
     Condition: IfRoute53HostedZoneId
     DependsOn:
@@ -467,10 +559,75 @@ Resources:
       Timeout: 30
     Type: AWS::Lambda::Function
 
+
+  LambdaFunctionRandomPassword:
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import cfnresponse
+          import json
+          import logging
+          import random
+          import string
+          import traceback
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response_data = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      length = int(properties.get('Length', 0))
+                      char_list = []
+                      char_list.extend(random.choices(string.ascii_lowercase, k=1))
+                      char_list.extend(random.choices(string.ascii_uppercase, k=1))
+                      char_list.extend(random.choices(string.digits, k=1))
+                      char_list.extend(random.choices(string.punctuation, k=1))
+                      char_list.extend(random.choices(string.ascii_letters + string.digits + string.punctuation, k=length-4))
+                      random.shuffle(char_list)
+                      response_data["RandomPassword"] = ''.join(char_list)
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, response_data)
+
+      Description: Generate string of random characters for a password.
+      FunctionName: !Sub "${AWS::StackName}-lambda-random-password"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-random-password"
+      Timeout: 600
+    Type: AWS::Lambda::Function
+
 # -- Run ECS tasks-------------------------------------------------------------
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
+
+  LambdaRunnerCognitoCreateUser:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      ClusterId: !Ref EcsCluster
+      ServiceToken: !GetAtt LambdaFunctionCognitoCreateUser.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-cognito-create-user"
+      UserPoolId: !Ref UserPool
+      WebPassword: !GetAtt LambdaRunnerWebPassword.RandomPassword
+      WebUsername: !Ref CognitoAdminEmail
+    Type: Custom::LambdaRunnerCognitoCreateUser
+
 
   LambdaRunnerFindDomainName:
     Condition: IfRoute53HostedZoneId
@@ -482,6 +639,17 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-lambda-runner-find-domain-name"
     Type: Custom::LambdaRunnerFindDomainName
+
+
+  LambdaRunnerWebPassword:
+    Properties:
+      ClusterId: !Ref EcsCluster
+      Length: 16
+      ServiceToken: !GetAtt LambdaFunctionRandomPassword.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-web-password"
+    Type: Custom::LambdaRunnerWebPassword
 
 # -- Load balancing -----------------------------------------------------------
 
@@ -553,29 +721,7 @@ Resources:
 #     Protocol: HTTPS
 #   Type: AWS::ElasticLoadBalancingV2::Listener
 
-  ListenerSwaggerHttps:
-    Condition: IfRoute53HostedZoneId
-    Properties:
-      Certificates:
-        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
-      DefaultActions:
-        - AuthenticateCognitoConfig:
-            OnUnauthenticatedRequest: authenticate
-            Scope: openid
-            UserPoolArn: !GetAtt UserPool.Arn
-            UserPoolClientId: !Ref UserPoolClient
-            UserPoolDomain: !Ref UserPoolDomain
-          Order: 1
-          Type: authenticate-cognito
-        - Order: 2
-          TargetGroupArn: !Ref TargetGroupSwagger
-          Type: forward
-      LoadBalancerArn: !Ref LoadBalancerPublic
-      Port: 8081
-      Protocol: HTTPS
-    Type: AWS::ElasticLoadBalancingV2::Listener
-
-# ListenerSwaggerHttps443:
+# ListenerSwaggerHttps:
 #   Condition: IfRoute53HostedZoneId
 #   Properties:
 #     Certificates:
@@ -584,7 +730,7 @@ Resources:
 #       - AuthenticateCognitoConfig:
 #           OnUnauthenticatedRequest: authenticate
 #           Scope: openid
-#           UserPoolArn: !GetAtt 'UserPool.Arn'
+#           UserPoolArn: !GetAtt UserPool.Arn
 #           UserPoolClientId: !Ref UserPoolClient
 #           UserPoolDomain: !Ref UserPoolDomain
 #         Order: 1
@@ -593,9 +739,31 @@ Resources:
 #         TargetGroupArn: !Ref TargetGroupSwagger
 #         Type: forward
 #     LoadBalancerArn: !Ref LoadBalancerPublic
-#     Port: 443
+#     Port: 8081
 #     Protocol: HTTPS
 #   Type: AWS::ElasticLoadBalancingV2::Listener
+
+  ListenerSwaggerHttps443:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      Certificates:
+        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+      DefaultActions:
+        - AuthenticateCognitoConfig:
+            OnUnauthenticatedRequest: authenticate
+            Scope: openid
+            UserPoolArn: !GetAtt 'UserPool.Arn'
+            UserPoolClientId: !Ref UserPoolClient
+            UserPoolDomain: !Ref UserPoolDomain
+          Order: 1
+          Type: authenticate-cognito
+        - Order: 2
+          TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerPublic
+      Port: 443
+      Protocol: HTTPS
+    Type: AWS::ElasticLoadBalancingV2::Listener
 
 # -- Route53RecordSet ---------------------------------------------------------
 
@@ -624,6 +792,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpool.html
 
   UserPool:
+    Condition: IfRoute53HostedZoneId
     Properties:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
@@ -645,7 +814,6 @@ Resources:
               </p>
               </html>
             - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
-
           EmailSubject: !Sub 'Temporary password for AWS ${AWS::StackName} stack'
           SMSMessage: 'Use the username {username} and the temporary password {####} to log in for the first time.'
       AutoVerifiedAttributes:
@@ -660,6 +828,7 @@ Resources:
           TemporaryPasswordValidityDays: 21
       UsernameAttributes:
         - email
+      UserPoolName: !Sub "${AWS::StackName}-user-pool"
     Type: AWS::Cognito::UserPool
 
 # -- UserPoolDomain -----------------------------------------------------------
@@ -667,6 +836,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooldomain.html
 
   UserPoolDomain: # Provides Cognito Login Page
+    Condition: IfRoute53HostedZoneId
     Properties:
 #     Domain: !Sub
 #       - "${AWS::StackName}.${DomainName}"
@@ -680,6 +850,7 @@ Resources:
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpoolclient.html
 
   UserPoolClient:
+    Condition: IfRoute53HostedZoneId
     Properties:
       AllowedOAuthFlows:
         - code # Required for ALB authentication
@@ -700,17 +871,16 @@ Resources:
 
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooluser.html
 
-  CognitoUserPoolAdmin:
-    Properties:
-      DesiredDeliveryMediums:
-        - EMAIL
-      UserAttributes:
-        - Name: email
-          Value: !Ref CognitoAdminEmail
-      Username: !Ref CognitoAdminEmail
-      UserPoolId: !Ref UserPool
-    Type: AWS::Cognito::UserPoolUser
-
+# UserPoolUser:
+#   Properties:
+#     DesiredDeliveryMediums:
+#       - EMAIL
+#     UserAttributes:
+#       - Name: email
+#         Value: !Ref CognitoAdminEmail
+#     Username: !Ref CognitoAdminEmail
+#     UserPoolId: !Ref UserPool
+#   Type: AWS::Cognito::UserPoolUser
 
 # -- EcsTaskDefinition --------------------------------------------------------
 
@@ -825,6 +995,14 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-subnet-public-2"
     Value: !Ref Ec2SubnetPublic2
+
+  WebPassword:
+    Description: 'Temporary password for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webpassword'
+    Value: !GetAtt LambdaRunnerWebPassword.RandomPassword
+
+  WebUsername:
+    Description: 'Username for web access. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#webusername'
+    Value: !Ref CognitoAdminEmail
 
   UrlSwagger:
     Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswagger'
