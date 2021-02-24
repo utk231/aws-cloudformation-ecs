@@ -630,14 +630,20 @@ Resources:
         InviteMessageTemplate:
           EmailMessage: !Sub
             - |
-              To log into https://${AWS::StackName}.${DomainName}:8081
-
-              Use these temporary credentials:
-                 Username:  {username}\n
-                 Password:  {####}\\n
-
-              You will be prompted to change your password.
-              This temporary password is valid for three weeks.
+              <html>
+              <p>
+                  To log into https://${AWS::StackName}.${DomainName}:8081,
+                  use these temporary credentials:
+                  <ul>
+                      <li><b>Username:</b>  {username}</li>
+                      <li><b>Password:</b>  {####}</li>
+                  </ul>
+              </p>
+              <p>
+                  You will be prompted to change your password.
+                  This temporary password is valid for three weeks.
+              </p>
+              </html>
             - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
 
           EmailSubject: !Sub 'Temporary password for AWS ${AWS::StackName} stack'
