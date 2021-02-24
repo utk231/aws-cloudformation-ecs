@@ -214,6 +214,7 @@ Resources:
        - !Ref IamRoleSwagger
     Type: AWS::IAM::Policy
 
+
   IamPolicyCognito:
     Properties:
       PolicyName: !Sub "${AWS::StackName}-iam-policy-cognito"
@@ -720,42 +721,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
 
 
-# ListenerSwaggerHttps:
-#   Condition: IfRoute53HostedZoneId
-#   Properties:
-#     Certificates:
-#       - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
-#     DefaultActions:
-#       - TargetGroupArn: !Ref TargetGroupSwagger
-#         Type: forward
-#     LoadBalancerArn: !Ref LoadBalancerPublic
-#     Port: 8081
-#     Protocol: HTTPS
-#   Type: AWS::ElasticLoadBalancingV2::Listener
-
-# ListenerSwaggerHttps:
-#   Condition: IfRoute53HostedZoneId
-#   Properties:
-#     Certificates:
-#       - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
-#     DefaultActions:
-#       - AuthenticateCognitoConfig:
-#           OnUnauthenticatedRequest: authenticate
-#           Scope: openid
-#           UserPoolArn: !GetAtt UserPool.Arn
-#           UserPoolClientId: !Ref UserPoolClient
-#           UserPoolDomain: !Ref UserPoolDomain
-#         Order: 1
-#         Type: authenticate-cognito
-#       - Order: 2
-#         TargetGroupArn: !Ref TargetGroupSwagger
-#         Type: forward
-#     LoadBalancerArn: !Ref LoadBalancerPublic
-#     Port: 8081
-#     Protocol: HTTPS
-#   Type: AWS::ElasticLoadBalancingV2::Listener
-
-  ListenerSwaggerHttps443:
+  ListenerSwaggerHttps:
     Condition: IfRoute53HostedZoneId
     Properties:
       Certificates:
@@ -813,7 +779,7 @@ Resources:
             - |
               <html>
               <p>
-                  To log into https://${AWS::StackName}.${DomainName}:8081,
+                  To log into https://${AWS::StackName}.${DomainName},
                   use these temporary credentials:
                   <ul>
                       <li><b>Username:</b>  {username}</li>
@@ -850,10 +816,7 @@ Resources:
   UserPoolDomain: # Provides Cognito Login Page
     Condition: IfRoute53HostedZoneId
     Properties:
-#     Domain: !Sub
-#       - "${AWS::StackName}.${DomainName}"
-#       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
-      Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']] # Generates a unique domain name
+      Domain: !Sub "${AWS::StackName}"
       UserPoolId: !Ref UserPool
     Type: AWS::Cognito::UserPoolDomain
 
@@ -1010,7 +973,7 @@ Outputs:
     Condition: IfRoute53HostedZoneId
     Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
     Value: !Sub
-      - "https://${AWS::StackName}.${DomainName}:8081"
+      - "https://${AWS::StackName}.${DomainName}"
       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
 
   WebPassword:
