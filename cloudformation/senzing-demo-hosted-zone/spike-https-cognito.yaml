@@ -1,0 +1,858 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# File format follows https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+
+Description: >-
+  Senzing aws-cloudformation-ecs/senzing-demo-hosted-zone/spike-https Version: 0.1.0
+  For more information see https://github.com/Senzing/aws-cloudformation-ecs
+# -----------------------------------------------------------------------------
+# Metadata
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/metadata-section-structure.html
+# -----------------------------------------------------------------------------
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Security
+        Parameters:
+          - CognitoAdminEmail
+          - CidrInbound
+          - Route53HostedZoneId
+    ParameterLabels:
+      CognitoAdminEmail:
+        default: 'Required: Email address for initial user.'
+      CidrInbound:
+        default: 'Required: Allowed inbound connections using CIDR notation.'
+      Route53HostedZoneId:
+        default: 'Optional: Specifing a hosted zone enables HTTPS.'
+
+# -----------------------------------------------------------------------------
+# Parameters
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+# -----------------------------------------------------------------------------
+
+Parameters:
+
+  CognitoAdminEmail:
+    Type: String
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#cognitoadminemail'
+
+  CidrInbound:
+    AllowedPattern: '(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?'
+    ConstraintDescription: Inbound CIDR must be in the format n.n.n.n/n
+    Default: 0.0.0.0/0
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#cidrinbound'
+    Type: String
+
+  Route53HostedZoneId:
+    Default: ''
+    Description: 'Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#route53hostedzoneid'
+    Type: AWS::Route53::HostedZone::Id
+
+# -----------------------------------------------------------------------------
+# Mappings
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+# -----------------------------------------------------------------------------
+
+Mappings:
+
+  Constants:
+    Stack:
+      Name: spike-https
+
+  VpcCidrs:
+    vpc:
+      cidr: 10.0.0.0/16
+    pubsubnet1:
+      cidr: 10.0.1.0/24
+    pubsubnet2:
+      cidr: 10.0.2.0/24
+    privsubnet1:
+      cidr: 10.0.3.0/24
+    privsubnet2:
+      cidr: 10.0.4.0/24
+
+# -----------------------------------------------------------------------------
+# Conditions
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html
+# -----------------------------------------------------------------------------
+
+Conditions:
+
+  IfRoute53HostedZoneId: !Not
+    - !Equals
+      - !Ref Route53HostedZoneId
+      - ''
+
+# -----------------------------------------------------------------------------
+# Resources
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+# -----------------------------------------------------------------------------
+
+Resources:
+
+# -- Iam -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+
+  IamRoleLambda:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - route53.amazonaws.com
+                - sqs.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-lambda"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-lambda"
+    Type: AWS::IAM::Role
+
+
+  IamRoleSwagger:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - route53.amazonaws.com
+        Version: '2012-10-17'
+      Description: !Sub "${AWS::StackName}-iam-role-swagger"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-iam-role-swagger"
+    Type: AWS::IAM::Role
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-policy.html
+
+  IamPolicyLoggingCreateStream:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-logging-create-stream"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyTaskRunner:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-task-runner"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - ecs:DescribeTasks
+              - ecs:RunTask
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyRoute53:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-route53"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - route53:GetHostedZone
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
+
+  IamPolicyCertificateManager:
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-iam-policy-certificate-manager"
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - acm:ListCertificates
+            Effect: Allow
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      Roles:
+       - !Ref IamRoleLambda
+       - !Ref IamRoleSwagger
+    Type: AWS::IAM::Policy
+
+# -- Logging ------------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
+
+  LogsLogGroupMain:
+    Properties:
+      LogGroupName: !Sub
+        - "/senzing/${StackName}/${AWS::StackName}"
+        - StackName: !FindInMap [Constants, Stack, Name]
+    Type: AWS::Logs::LogGroup
+
+
+  LogsLogGroupLambdaFindDomainName:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-lambda-find-domain-name"
+    Type: AWS::Logs::LogGroup
+
+# -- Cloud, subnets, routing --------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+
+  Ec2Vpc:
+    Properties:
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - vpc
+        - cidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-vpc"
+    Type: AWS::EC2::VPC
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+
+  Ec2SubnetPublic1:
+    Properties:
+      AvailabilityZone: !Select
+          - '0'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet1
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-public-1"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+
+  Ec2SubnetPublic2:
+    Properties:
+      AvailabilityZone: !Select
+          - '1'
+          - !GetAZs
+            Ref: AWS::Region
+      CidrBlock: !FindInMap
+        - VpcCidrs
+        - pubsubnet2
+        - cidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-subnet-public-2"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::Subnet
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+
+  Ec2SecurityGroupLoadBalancerPublic:
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} - Public load balancer open ports."
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          Description: All
+          IpProtocol: '-1'
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-security-group-load-balancer-public"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::SecurityGroup
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+
+  Ec2SecurityGroupIngresSwagger:
+    Properties:
+      CidrIp: !Ref CidrInbound
+      Description: Swagger UI
+      FromPort: 8080
+      GroupId: !Ref Ec2SecurityGroupLoadBalancerPublic
+      IpProtocol: tcp
+      ToPort: 8081
+    Type: AWS::EC2::SecurityGroupIngress
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+
+  Ec2InternetGateway:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-internet-gateway"
+    Type: AWS::EC2::InternetGateway
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
+
+  Ec2VpcGatewayAttachment:
+    Properties:
+      InternetGatewayId: !Ref Ec2InternetGateway
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::VPCGatewayAttachment
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+
+  Ec2RouteTablePublic:
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ec2-route-table-public"
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::EC2::RouteTable
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+
+  Ec2RoutePublic:
+    DependsOn:
+     - Ec2VpcGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Ec2InternetGateway
+      RouteTableId: !Ref Ec2RouteTablePublic
+    Type: AWS::EC2::Route
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+
+  Ec2SubnetRouteTableAssociationPublic1:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTablePublic
+      SubnetId: !Ref Ec2SubnetPublic1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+
+  Ec2SubnetRouteTableAssociationPublic2:
+    Properties:
+      RouteTableId: !Ref Ec2RouteTablePublic
+      SubnetId: !Ref Ec2SubnetPublic2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+# -- ECS Cluster --------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
+
+  EcsCluster:
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-cluster"
+    Type: AWS::ECS::Cluster
+
+# -- LambdaFunction -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
+
+  LambdaFunctionFindDomainName:
+    Condition: IfRoute53HostedZoneId
+    DependsOn:
+     - IamPolicyRoute53
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+          import boto3
+          import cfnresponse
+          import datetime
+          import json
+          import logging
+          import traceback
+          from json import JSONEncoder
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          class DateTimeEncoder(JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, (datetime.date, datetime.datetime)):
+                      return obj.isoformat()
+          def find_certificate_arn(certificate_domain_name, certificate_list):
+              certificate_summary_list = certificate_list.get('CertificateSummaryList', [])
+              for certificate_summary in certificate_summary_list:
+                  if certificate_summary.get('DomainName') == certificate_domain_name:
+                     return certificate_summary.get('CertificateArn')
+              return ""
+          def handler(event, context):
+              result = cfnresponse.SUCCESS
+              response = {}
+              try:
+                  logger.info("Event: {0}".format(json.dumps(event)))
+                  if event['RequestType'] in ['Create', 'Update']:
+                      properties = event.get('ResourceProperties', {})
+                      hosted_zone_id = properties.get('HostedZoneId', {})
+                      # Find domain in AWS Route53
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/route53.html
+                      route53 = boto3.client('route53')
+                      hosted_zone_dict = route53.get_hosted_zone(Id=hosted_zone_id)
+                      name = hosted_zone_dict.get("HostedZone", {}).get("Name", " ")
+                      response["Name"] = name
+                      response["DomainName"] = name[:-1]
+                      # Find Certificate in AWS Certificate Manager
+                      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/acm.html
+                      certificate_domain_name = "*.{0}".format(response["DomainName"])
+                      logger.info("domain_name = {0}".format(certificate_domain_name))
+                      acm_client = boto3.client('acm')
+                      certificate_list = acm_client.list_certificates()
+                      certificate_arn = find_certificate_arn(certificate_domain_name, certificate_list)
+                      response["CertificateArn"] = certificate_arn
+                      logger.info("certificate_arn = {0}".format(certificate_arn))
+                      if not certificate_arn:
+                          logger.warning("Cannot find certificate for '{0}'".format(certificate_domain_name))
+                          result = cfnresponse.FAILED
+                  logger.info("Response: {0}".format(json.dumps(response, cls=DateTimeEncoder)))
+              except Exception as e:
+                  logger.error(e)
+                  traceback.print_exc()
+                  result = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, result, response)
+      Description: Gets Route53 hosted zone information.
+      FunctionName: !Sub "${AWS::StackName}-lambda-find-domain-name"
+      Handler: index.handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-find-domain-name"
+      Timeout: 30
+    Type: AWS::Lambda::Function
+
+# -- Run ECS tasks-------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-custom-resources.html
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cfn-customresource.html
+
+  LambdaRunnerFindDomainName:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      ClusterId: !Ref EcsCluster
+      HostedZoneId: !Ref Route53HostedZoneId
+      ServiceToken: !GetAtt LambdaFunctionFindDomainName.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-lambda-runner-find-domain-name"
+    Type: Custom::LambdaRunnerFindDomainName
+
+# -- Load balancing -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
+
+  LoadBalancerPublic:
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref Ec2SecurityGroupLoadBalancerPublic
+      Subnets:
+        - !Ref Ec2SubnetPublic1
+        - !Ref Ec2SubnetPublic2
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-load-balancer-public"
+      Type: application
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
+
+  TargetGroupSwagger:
+    DependsOn:
+     - LoadBalancerPublic
+    Properties:
+      HealthCheckIntervalSeconds: 80
+      HealthCheckPath: '/'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 50
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200-299
+      Port: 8080
+      Protocol: HTTP
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-target-group-swagger"
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '60'
+      TargetType: ip
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref Ec2Vpc
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+
+  ListenerSwaggerHttp:
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerPublic
+      Port: 80
+      Protocol: HTTP
+    Type: AWS::ElasticLoadBalancingV2::Listener
+  
+  ListenerRuleSwaggerPath:
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupSwagger
+      Conditions:
+        - Field: path-pattern
+          Values: ['/swagger']
+      ListenerArn: !Ref ListenerSwaggerHttp
+      Priority: 1
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+
+
+# ListenerSwaggerHttps:
+#   Condition: IfRoute53HostedZoneId
+#   Properties:
+#     Certificates:
+#       - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+#     DefaultActions:
+#       - TargetGroupArn: !Ref TargetGroupSwagger
+#         Type: forward
+#     LoadBalancerArn: !Ref LoadBalancerPublic
+#     Port: 8081
+#     Protocol: HTTPS
+#   Type: AWS::ElasticLoadBalancingV2::Listener
+
+  ListenerSwaggerHttps:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      Certificates:
+        - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+      DefaultActions:
+        - AuthenticateCognitoConfig:
+            OnUnauthenticatedRequest: authenticate
+            Scope: openid
+            UserPoolArn: !GetAtt UserPool.Arn
+            UserPoolClientId: !Ref UserPoolClient
+            UserPoolDomain: !Ref UserPoolDomain
+          Order: 1
+          Type: authenticate-cognito
+        - Order: 2
+          TargetGroupArn: !Ref TargetGroupSwagger
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancerPublic
+      Port: 443
+      Protocol: HTTPS
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+  ListenerRuleSwaggerHttpsPath:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupSwagger
+      Conditions:
+        - Field: path-pattern
+          Values: ['/swagger']
+      ListenerArn: !Ref ListenerSwaggerHttps
+      Priority: 1
+    Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+
+# ListenerSwaggerHttps443:
+#   Condition: IfRoute53HostedZoneId
+#   Properties:
+#     Certificates:
+#       - CertificateArn: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+#     DefaultActions:
+#       - AuthenticateCognitoConfig:
+#           OnUnauthenticatedRequest: authenticate
+#           Scope: openid
+#           UserPoolArn: !GetAtt 'UserPool.Arn'
+#           UserPoolClientId: !Ref UserPoolClient
+#           UserPoolDomain: !Ref UserPoolDomain
+#         Order: 1
+#         Type: authenticate-cognito
+#       - Order: 2
+#         TargetGroupArn: !Ref TargetGroupSwagger
+#         Type: forward
+#     LoadBalancerArn: !Ref LoadBalancerPublic
+#     Port: 443
+#     Protocol: HTTPS
+#   Type: AWS::ElasticLoadBalancingV2::Listener
+
+# -- Route53RecordSet ---------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset.html
+
+  Route53RecordSet:
+    Condition: IfRoute53HostedZoneId
+    Properties:
+      AliasTarget:
+        DNSName: !Sub
+          - "dualstack.${LoadBalancerPublicDNSName}"
+          - LoadBalancerPublicDNSName: !GetAtt LoadBalancerPublic.DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt LoadBalancerPublic.CanonicalHostedZoneID
+      Comment: !Sub "${AWS::StackName} RecordSet"
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub
+        - "${StackName}.${DomainName}"
+        - StackName: !Ref AWS::StackName
+          DomainName: !GetAtt LambdaRunnerFindDomainName.Name
+      Type: A
+    Type: AWS::Route53::RecordSet
+
+# -- UserPool -----------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpool.html
+
+  UserPool:
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+        InviteMessageTemplate:
+          EmailMessage: !Sub
+            - |
+              <html>
+              <p>
+                  To log into https://${AWS::StackName}.${DomainName},
+                  use these temporary credentials:
+                  <ul>
+                      <li><b>Username:</b>  {username}</li>
+                      <li><b>Password:</b>  {####}</li>
+                  </ul>
+              </p>
+              <p>
+                  You will be prompted to change your password.
+                  This temporary password is valid for three weeks.
+              </p>
+              </html>
+            - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+
+          EmailSubject: !Sub 'Temporary password for AWS ${AWS::StackName} stack'
+          SMSMessage: 'Use the username {username} and the temporary password {####} to log in for the first time.'
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 16
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 21
+      UsernameAttributes:
+        - email
+    Type: AWS::Cognito::UserPool
+
+# -- UserPoolDomain -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooldomain.html
+
+  UserPoolDomain: # Provides Cognito Login Page
+    Properties:
+#     Domain: !Sub
+#       - "${AWS::StackName}.${DomainName}"
+#       - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+      Domain: !Select [2, !Split ['/', !Ref 'AWS::StackId']] # Generates a unique domain name
+      UserPoolId: !Ref UserPool
+    Type: AWS::Cognito::UserPoolDomain
+
+# -- UserPoolClient -----------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpoolclient.html
+
+  UserPoolClient:
+    Properties:
+      AllowedOAuthFlows:
+        - code # Required for ALB authentication
+      AllowedOAuthFlowsUserPoolClient: true # Required for ALB authentication
+      AllowedOAuthScopes:
+        - openid
+      CallbackURLs:
+        - !Sub
+          - "https://${AWS::StackName}.${DomainName}/oauth2/idpresponse"
+          - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+      GenerateSecret: true
+      SupportedIdentityProviders: # Optional: add providers for identity federation
+        - COGNITO
+      UserPoolId: !Ref UserPool
+    Type: AWS::Cognito::UserPoolClient
+
+# -- UserPoolUser -------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooluser.html
+
+  CognitoUserPoolAdmin:
+    Properties:
+      DesiredDeliveryMediums:
+        - EMAIL
+      UserAttributes:
+        - Name: email
+          Value: !Ref CognitoAdminEmail
+      Username: !Ref CognitoAdminEmail
+      UserPoolId: !Ref UserPool
+    Type: AWS::Cognito::UserPoolUser
+
+
+# -- EcsTaskDefinition --------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+
+  EcsTaskDefinitionSwagger:
+    Properties:
+      ContainerDefinitions:
+        -
+          Environment:
+            -
+              Name: URL
+              Value: "https://raw.githubusercontent.com/Senzing/senzing-rest-api-specification/master/senzing-rest-api.yaml"
+          Essential: true
+          Image: public.ecr.aws/senzing/swagger-ui:latest
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogsLogGroupMain
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: service
+          Name: swagger
+          PortMappings:
+            - ContainerPort: 8080
+              HostPort: 8080
+              Protocol: tcp
+          Privileged: false
+          ReadonlyRootFilesystem: false
+      Cpu: '1024'
+      ExecutionRoleArn: !GetAtt IamRoleSwagger.Arn
+      Family: !Sub "${AWS::StackName}-task-definition-swagger"
+      Memory: '8192'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-task-definition-swagger"
+      TaskRoleArn: !GetAtt IamRoleSwagger.Arn
+    Type: AWS::ECS::TaskDefinition
+
+# -- EcsService ---------------------------------------------------------------
+
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
+
+  EcsServiceSwagger:
+    DependsOn:
+     - ListenerSwaggerHttp
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        -
+          ContainerPort: 8080
+          ContainerName: swagger
+          TargetGroupArn: !Ref TargetGroupSwagger
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref Ec2SecurityGroupLoadBalancerPublic
+          Subnets:
+            - !Ref Ec2SubnetPublic1
+            - !Ref Ec2SubnetPublic2
+      PlatformVersion: 1.4.0
+      PropagateTags: TASK_DEFINITION
+      ServiceName: swagger
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ecs-service-swagger"
+      TaskDefinition: !Ref EcsTaskDefinitionSwagger
+    Type: AWS::ECS::Service
+
+# -----------------------------------------------------------------------------
+# Outputs
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  AccountID:
+    Description: 'The accountID'
+    Value: !Sub "${AWS::AccountId}"
+
+  CertificateArn:
+    Condition: IfRoute53HostedZoneId
+    Description: 'ARN of the SSL certificate. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#certificatearn'
+    Value: !GetAtt LambdaRunnerFindDomainName.CertificateArn
+
+  Ec2Vpc:
+    Description: 'The ID of the VPC. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#ec2vpc'
+    Export:
+      Name: !Sub "${AWS::StackName}-ec2-VpcId"
+    Value: !Ref Ec2Vpc
+
+  Host:
+    Description: 'Host name of public services. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#host'
+    Export:
+      Name: !Sub "${AWS::StackName}-host"
+    Value: !GetAtt LoadBalancerPublic.DNSName
+
+  SubnetPublic1:
+    Description: 'The ID of public subnet 1. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#subnetpublic1'
+    Export:
+      Name: !Sub "${AWS::StackName}-subnet-public-1"
+    Value: !Ref Ec2SubnetPublic1
+
+  SubnetPublic2:
+    Description: 'The ID of public subnet 2. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#subnetpublic2'
+    Export:
+      Name: !Sub "${AWS::StackName}-subnet-public-2"
+    Value: !Ref Ec2SubnetPublic2
+
+  UrlSwagger:
+    Description: 'URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswagger'
+    Value: !Sub "http://${LoadBalancerPublic.DNSName}:8080"
+
+  UrlSwaggerHttp:
+    Condition: IfRoute53HostedZoneId
+    Description: 'HTTP URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttp'
+    Value: !Sub
+      - "http://${AWS::StackName}.${DomainName}:8080"
+      - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+
+  UrlSwaggerHttps:
+    Condition: IfRoute53HostedZoneId
+    Description: 'HTTPS URL for Swagger. Help: http://hub.senzing.com/aws-cloudformation-ecs-poc-simple/#urlswaggerhttps'
+    Value: !Sub
+      - "https://${AWS::StackName}.${DomainName}:8081"
+      - DomainName: !GetAtt LambdaRunnerFindDomainName.DomainName
+
+  XxBob:
+    Value: !Select [2, !Split ['/', !Ref 'AWS::StackId']]
